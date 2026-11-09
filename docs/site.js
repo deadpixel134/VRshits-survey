@@ -29,8 +29,8 @@ function applySplit(percent,save=false){
   const {min,max}=splitLimits();
   splitPercent=Math.min(max,Math.max(min,percent));
   splitLayout.style.setProperty('--reading-split',splitPercent+'%');
-  splitBar.setAttribute('aria-valuemin',String(Math.ceil(min)));
-  splitBar.setAttribute('aria-valuemax',String(Math.floor(max)));
+  splitBar.setAttribute('aria-valuemin',String(Math.floor(min)));
+  splitBar.setAttribute('aria-valuemax',String(Math.ceil(max)));
   splitBar.setAttribute('aria-valuenow',String(Math.round(splitPercent)));
   splitBar.setAttribute('aria-valuetext','본문 '+Math.round(splitPercent)+'%, 그래프 '+Math.round(100-splitPercent)+'%');
   if(save)try{localStorage.setItem(savedSplitKey,String(splitPercent));}catch(_error){}
