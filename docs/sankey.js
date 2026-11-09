@@ -1,20 +1,10 @@
 const $=id=>document.getElementById(id), NS='http://www.w3.org/2000/svg';
 const cfg={perception:{keys:['content','gpu_vendor','gpu','perception'],titles:['주력 콘텐츠','GPU 제조사','GPU 모델','사양 체감']},content:{keys:['previous_content','content'],titles:['1년 전 콘텐츠','현재 콘텐츠']},perf:{keys:['hmd','gpu','performance'],titles:['주력 HMD','exact GPU','전반적 VR 성능']},mode:{keys:['hmd','mode'],titles:['주력 HMD','사용 비중']}};
-const cfgByDestination={
- perception:{keys:['gpu_destination','perception'],titles:['GPU · 목적지별 상위 5종 + 기타','사양 체감']},
- perf:{keys:['gpu_destination','performance'],titles:['GPU · 목적지별 상위 5종 + 기타','전반적 VR 성능']}
-};
 const fixed={'VRChat':'#7950b8','리듬게임':'#d48800','FPS·슈팅·액션':'#ca5155','시뮬레이션':'#168b87','VR MOD':'#3779bf','기타 콘텐츠':'#788391','NVIDIA':'#57932b','AMD':'#c7464a','Intel':'#267fcb','상옵':'#17827b','중옵':'#397bb9','하옵':'#cf8a23','겨우':'#c34c58','여유':'#17827b','대체로 유지':'#397bb9','가끔 저하·플레이 가능':'#8c78b8','설정 크게 낮춤':'#c48b26','잦은 저하':'#d46a3a','플레이 어려움':'#b83c55','모름':'#89929c','PCVR 우세':'#3779bf','Standalone 우세':'#168b87','비슷하게 사용':'#9572bb'};
 const colorMaps={};
 function family(k){return k==='previous_hmd'?'hmd':k==='previous_content'?'content':k;}
 for(const [key,values]of Object.entries(DATA.labels)){colorMaps[key]=Object.fromEntries(values.map((v,i)=>[v,fixed[v]||`hsl(${Math.round((i*137.508+23)%360)} 52% ${40+(i%3)*7}%)`]));}
-const color=(k,v)=>{
- if(k==='gpu_destination'){
-  const gpu=v.slice(0,v.lastIndexOf(' · '));
-  return gpu==='기타 GPU'?'#89929c':colorMaps.gpu[gpu]||'#89929c';
- }
- return colorMaps[family(k)]?.[v]||'#89929c';
-};
+const color=(k,v)=>colorMaps[family(k)]?.[v]||'#89929c';
 let currentLinks=[];
 
 const gpuLimit=$('gpuLimit');
@@ -22,33 +12,31 @@ const selectionInfo=$('selectionInfo');
 const clearSelection=$('clearSelection');
 const chart=$('chart');
 let currentN=0,rawLinks=[],selectedFocus=null,hoverFocus=null,nodeIndex=[],currentConfig=null;
-/* Group the GPU→destination observations independently for each destination.
-   Do NOT connect upstream HMD/content categories to those per-destination GPU nodes:
-   only adjacent-pair aggregates are available, not respondent-level full paths. */
+/* Default to the complete, unmodified flow. Optional top-N modes group
+   all smaller GPU models into one node across every stage consistently. */
 function displaySubset(original,type){
- const gpuIndex=cfg[type].keys.indexOf('gpu');
- if(gpuIndex<0||gpuLimit.value==='all')return {...original,viewConfig:cfg[type]};
- const groups=new Map();
+ const gpuIndex=cfg[type].keys.indexOf('gpu'),count=gpuLimit.value;
+ if(gpuIndex<0||count==='all')return original;
+ const totals=new Map();
  for(const row of original.links){
-  if(row[0]!==gpuIndex+1)continue;
-  const target=row[2],items=groups.get(target)||[];
-  items.push({gpu:row[1],count:row[3]});
-  groups.set(target,items);
+  if(row[0]!==gpuIndex)continue;
+  totals.set(row[2],(totals.get(row[2])||0)+row[3]);
  }
- const edges=[];
- for(const [target,items] of groups){
-  const ranked=[...items].sort((a,b)=>b.count-a.count||a.gpu.localeCompare(b.gpu));
-  const selected=new Set(ranked.slice(0,5).map(item=>item.gpu));
-  const totals=new Map();
-  for(const item of items){
-   const name=selected.has(item.gpu)?item.gpu:'기타 GPU';
-   totals.set(name,(totals.get(name)||0)+item.count);
-  }
-  for(const [name,count] of totals){
-   edges.push([1,name+' · '+target,target,count,original.n]);
-  }
+ const keep=new Set([...totals]
+  .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))
+  .slice(0,Number(count)).map(row=>row[0]));
+ if(totals.size<=keep.size)return original;
+ const merged=new Map();
+ for(const row of original.links){
+  const stage=row[0];
+  const from=stage===gpuIndex+1&&!keep.has(row[1])?'기타 GPU 모델':row[1];
+  const to=stage===gpuIndex&&!keep.has(row[2])?'기타 GPU 모델':row[2];
+  const key=JSON.stringify([stage,from,to]);
+  const existing=merged.get(key);
+  if(existing)existing[3]+=row[3];
+  else merged.set(key,[stage,from,to,row[3],original.n]);
  }
- return {n:original.n,links:edges,viewConfig:cfgByDestination[type]};
+ return {...original,links:[...merged.values()]};
 }
 
 function itemFromTarget(target){
@@ -120,19 +108,12 @@ function resetSelection(){
 }
 
 function el(tag,attrs={},text){const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;}
-function render(){const type=$('diagram').value;const original=DATA.charts[type][$('group').value+(type==='content'&&!$('exclude').checked?'|all':'')];const selected=displaySubset(original,type);const c=selected.viewConfig;currentConfig=c;const n=selected.n;currentN=n;rawLinks=original.links.map(r=>[r[0],r[1],r[2],r[3],n]);$('gpuLimitControl').hidden=!cfg[type].keys.includes('gpu');$('exclude').parentElement.hidden=type!=='content';
-$('scope').textContent=`현재 도표 분모 n=${n}. ${type==='perception'?'본인 PC 사양에 대한 주관적 평가(상옵·중옵·하옵·겨우). 측정 FPS나 실제 게임 옵션이 아닙니다.':type==='perf'?'PC 성능 주분석 대상, 성능 모름 포함.':type==='mode'?'PCVR 우세 / 비슷하게 사용 / Standalone 우세. 전체 148명 기준.':type==='content'?'2026 응답자의 회고값이며 2025 표본 추적이 아님.':type==='hmd'?'교체와 추가 병행을 포함. 유지값은 파생이며 신규 입문은 별도.':'주력 콘텐츠 기준. GPU 원문 모델은 통합하지 않음.'}`;
-if(c.keys.includes('gpu_destination'))$('scope').textContent+=' GPU→목적지의 실제 연결 인원을 기준으로 각 목적지별 상위 5종과 나머지를 따로 표시합니다. 앞단 HMD·콘텐츠와의 연계는 전체 흐름 모드에서 확인하세요.';
+function render(){const type=$('diagram').value;const original=DATA.charts[type][$('group').value+(type==='content'&&!$('exclude').checked?'|all':'')];const selected=displaySubset(original,type);const c=cfg[type];currentConfig=c;const n=selected.n;currentN=n;rawLinks=original.links.map(r=>[r[0],r[1],r[2],r[3],n]);$('gpuLimitControl').hidden=!cfg[type].keys.includes('gpu');$('exclude').parentElement.hidden=type!=='content';
 const ordered={perception:['상옵','중옵','하옵','겨우'],performance:['여유','대체로 유지','가끔 저하·플레이 가능','잦은 저하','설정 크게 낮춤','플레이 어려움','모름']};
-const compare=(k,a,b)=>{
- if(k==='gpu_destination'){
-  const destination=type==='perception'?'perception':'performance';
-  const targetOf=name=>name.slice(name.lastIndexOf(' · ')+3);
-  const order=ordered[destination],diff=order.indexOf(targetOf(a[0]))-order.indexOf(targetOf(b[0]));
-  return diff||b[1]-a[1]||a[0].localeCompare(b[0]);
- }
- return k==='gpu'?(DATA.gpuScores[b[0]]??-1)-(DATA.gpuScores[a[0]]??-1)||a[0].localeCompare(b[0]):ordered[k]?ordered[k].indexOf(a[0])-ordered[k].indexOf(b[0]):b[1]-a[1]||a[0].localeCompare(b[0]);
-};
+const compare=(k,a,b)=>k==='gpu'
+ ?(DATA.gpuScores[b[0]]??-1)-(DATA.gpuScores[a[0]]??-1)||a[0].localeCompare(b[0])
+ :ordered[k]?ordered[k].indexOf(a[0])-ordered[k].indexOf(b[0])
+ :b[1]-a[1]||a[0].localeCompare(b[0]);
 const layers=c.keys.map((k,i)=>{const m=new Map;for(const l of selected.links.filter(l=>l[0]===(i===0?1:i))){const name=l[i===0?1:2];m.set(name,(m.get(name)||0)+l[3]);}return [...m].sort((a,b)=>compare(k,a,b)).map(([name,value])=>({name,value,layer:i,inOff:0,outOff:0}));});
 const maxNodes=Math.max(1,...layers.map(x=>x.length)),H=Math.max(640,maxNodes*38+100),W=1500,top=65,bottom=35,gap=15,scale=n?(H-top-bottom-(maxNodes-1)*gap)/n:1;
 const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:W,height:H,role:'img','aria-label':c.titles.join(' → ')});const maps=layers.map((layer,i)=>{const total=n*scale+(layer.length-1)*gap;let y=top+(H-top-bottom-total)/2;const x=30+i*(W-390)/(layers.length-1);svg.append(el('text',{x,y:30,'font-size':17,'font-weight':700,fill:'#23364d'},c.titles[i]));const m=new Map;for(const node of layer){node.x=x;node.y=y;node.h=node.value*scale;y+=node.h+gap;m.set(node.name,node);}return m;});nodeIndex=layers.flat();
