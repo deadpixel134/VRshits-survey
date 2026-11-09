@@ -43,10 +43,13 @@ for(const page of sankeyPages){
 }
 for(const page of ['index.html','sankey.html']){
  const markup=pages[page];
- assert(markup.includes('<option value="5" selected>목적지별 상위 5종 + 기타</option>'),
-   'GPU grouping should default to destination-specific top five in '+page);
- assert(markup.includes('<option value="all">원본 전체 흐름 (모든 GPU)</option>'),
-   'Must retain original HMD/content→GPU→outcome view in '+page);
+ assert(markup.includes('<option value="all" selected>모든 GPU 표시</option>'),
+   'GPU selection should show every GPU by default in '+page);
+ assert(markup.includes('<option value="12">상위 12종 + 기타</option>') &&
+        markup.includes('<option value="20">상위 20종 + 기타</option>'),
+   'Optional top-12 and top-20 GPU groupings must be available in '+page);
+ assert(!markup.includes('id="scope"'),
+   'Do not show the chart denominator explanation block in '+page);
 }
 const sankeyScript=read('sankey.js');
 assert(sankeyScript.includes('function displaySubset(') &&
