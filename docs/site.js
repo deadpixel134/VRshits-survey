@@ -7,7 +7,7 @@ toggle.onclick=()=>setGraph(document.body.classList.contains('graph-closed'));mo
 function view(name){document.querySelectorAll('article').forEach(a=>a.hidden=a.id!==name);document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));const toc=document.getElementById('toc');toc.replaceChildren();document.querySelectorAll('#'+name+' h2').forEach(h=>{const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a)});}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view(b.dataset.view);history.replaceState(null,'','#'+b.dataset.view);window.scrollTo({top:0,behavior:'smooth'});});
 function isDetailHash(){return /^#(?:detailed|detail-|hypothesis-)/.test(location.hash);}
-function focusDeepLink(smooth=false){const id=decodeURIComponent(location.hash.slice(1));if(!/^hypothesis-0[1-7]$/.test(id))return;requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'}));}
+function focusDeepLink(smooth=false){const id=decodeURIComponent(location.hash.slice(1));if(!/^(?:hypothesis-0[1-7]|detail-hypotheses|detail-evidence-map|detail-forecast)$/.test(id))return;requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'}));}
 view(isDetailHash()?'detailed':'general');
 document.querySelectorAll('a[data-detail-link]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const id=a.getAttribute('data-detail-link');if(!/^hypothesis-0[1-7]$/.test(id))return;view('detailed');history.pushState(null,'','#'+id);focusDeepLink(true);}));
 window.addEventListener('hashchange',()=>{view(isDetailHash()?'detailed':'general');focusDeepLink();});
