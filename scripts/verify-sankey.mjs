@@ -53,9 +53,9 @@ class Element{
 }
 
 const elements={};
-for(const id of ['diagram','group','exclude','scope','gpuLimitControl','gpuLimit','nodeJump','chart','legend','links','download','selectionInfo','clearSelection'])elements[id]=new Element(id);
+for(const id of ['diagram','group','exclude','scope','gpuLimitControl','gpuLimit','nodeJump','zoom','chart','legend','links','download','selectionInfo','clearSelection'])elements[id]=new Element(id);
 elements.diagram.value='perception';elements.group.value='전체';
-elements.gpuLimit.value='12';elements.exclude.checked=true;
+elements.gpuLimit.value='12';elements.zoom.value='100';elements.exclude.checked=true;
 const document={
  getElementById:id=>elements[id],
  createElement:tag=>new Element(tag),
