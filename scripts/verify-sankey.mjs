@@ -229,6 +229,11 @@ const fitAPI=new Function('document','location','URLSearchParams','ResizeObserve
 fitAPI.updateChartZoom();
 assert.equal(Number(slider.value),36,'Initial chart should fit a 550px viewport');
 assert.equal(chartSVG.style.width,'540px','SVG width should be close to viewport');
+const redrawSVG={style:{width:'1500px'}};
+viewport.querySelector=selector=>selector==='svg'?redrawSVG:null;
+fitAPI.updateChartZoom();
+assert.equal(Number(slider.value),36,'Rerender at unchanged viewport keeps fit percentage');
+assert.equal(redrawSVG.style.width,'540px','New SVG must be fitted even if the percentage is unchanged');
 controls.zoomIn.onclick();
 assert.equal(Number(slider.value),46,'User should be able to zoom manually');
 viewport.clientWidth=850;
