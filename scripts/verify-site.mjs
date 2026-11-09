@@ -33,6 +33,28 @@ const communityRouter=read('community.js');
 assert(communityRouter.includes("byId('includeDetail').checked?'href="),
        'Missing local links when community HTML includes the full detail');
 
+// Both Sankey surfaces must expose the same native keyboard and pointer controls.
+const sankeyPages=['index.html','sankey.html'];
+for(const page of sankeyPages){
+ const markup=pages[page];
+ for(const id of ['diagram','group','gpuLimit','nodeJump','zoom','zoomValue','zoomIn','zoomOut','fit','resetView','selectionInfo','clearSelection','chart','download']){
+  assert(markup.includes('id="'+id+'"'),'Missing Sankey control '+id+' in '+page);
+ }
+}
+const sankeyScript=read('sankey.js');
+assert(sankeyScript.includes('function displaySubset(') &&
+       sankeyScript.includes("rawLinks=original.links.map") &&
+       sankeyScript.includes("tr.setAttribute('role','button')") &&
+       sankeyScript.includes("chart.addEventListener('pointerover'"),
+       'Missing Sankey compact data, CSV preservation, keyboard table or path highlighting');
+const zoomScript=read('site.js');
+assert(zoomScript.includes("chartViewport.addEventListener('wheel'") &&
+       zoomScript.includes("chartViewport.setPointerCapture") &&
+       zoomScript.includes('function fitGraph()'),
+       'Missing Sankey zoom and drag navigation logic');
+assert(existsSync(resolve(process.cwd(),'scripts/verify-sankey.mjs')),
+       'Missing executable Sankey UI regression tests');
+
 const css = read('style.css');
 const splitLogic = read('site.js');
 assert(css.includes('.splitter{') && css.includes('display:none!important'),
