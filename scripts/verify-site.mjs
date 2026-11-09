@@ -41,6 +41,13 @@ for(const page of sankeyPages){
   assert(markup.includes('id="'+id+'"'),'Missing Sankey control '+id+' in '+page);
  }
 }
+for(const page of ['index.html','sankey.html']){
+ const markup=pages[page];
+ assert(markup.includes('<option value="5" selected>목적지별 상위 5종 + 기타</option>'),
+   'GPU grouping should default to destination-specific top five in '+page);
+ assert(markup.includes('<option value="all">원본 전체 흐름 (모든 GPU)</option>'),
+   'Must retain original HMD/content→GPU→outcome view in '+page);
+}
 const sankeyScript=read('sankey.js');
 assert(sankeyScript.includes('function displaySubset(') &&
        sankeyScript.includes("rawLinks=original.links.map") &&
