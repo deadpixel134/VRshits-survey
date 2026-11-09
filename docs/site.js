@@ -1,7 +1,7 @@
 const zoom=document.getElementById('zoom');
 const chartViewport=document.getElementById('chart');
 const zoomValue=document.getElementById('zoomValue');
-let fitToWidth=false;
+let fitToWidth=true;
 function applyZoom(){
  const svg=chartViewport.querySelector('svg');
  if(svg)svg.style.width=(1500*Number(zoom.value)/100)+'px';
@@ -9,7 +9,7 @@ function applyZoom(){
 }
 function setZoom(value,x=chartViewport.clientWidth/2,y=chartViewport.clientHeight/2){
  const old=Number(zoom.value),min=Number(zoom.min),max=Number(zoom.max);
- const next=Math.max(min,Math.min(max,Math.round(value/5)*5));
+ const next=Math.max(min,Math.min(max,Math.round(value)));
  if(old===next)return;
  zoom.value=next;applyZoom();
  const ratio=next/old;
@@ -18,8 +18,16 @@ function setZoom(value,x=chartViewport.clientWidth/2,y=chartViewport.clientHeigh
 }
 function fitGraph(){
  fitToWidth=true;
- setZoom(Math.floor(chartViewport.clientWidth/75)*5);
+ // Leave a small inset so the SVG does not require horizontal scrolling.
+ const width=chartViewport.clientWidth;
+ if(width<=0)return; // Hidden mobile sheet: fit when it becomes visible.
+ const percentage=Math.floor((width-8)/1500*100);
+ setZoom(percentage);
  chartViewport.scrollLeft=0;
+}
+function updateChartZoom(){
+ if(fitToWidth)fitGraph();
+ else applyZoom();
 }
 zoom.addEventListener('input',()=>{
  fitToWidth=false;
@@ -65,7 +73,7 @@ applyZoom();
 
 const reading=document.getElementById('reading');
 if(reading){const panel=document.getElementById('graphPanel'),toggle=document.getElementById('toggleGraph'),mobile=document.getElementById('mobileGraph');let lastTrigger=null;
-function setGraph(open){document.body.classList.toggle('graph-closed',!open);document.body.classList.toggle('mobile-open',open);toggle.setAttribute('aria-expanded',String(open));mobile.setAttribute('aria-expanded',String(open));toggle.textContent=open?'그래프 접기':'그래프 열기';mobile.textContent=open?'Sankey 그래프 접기 ↓':'Sankey 그래프 열기 ↑';if(!open&&lastTrigger)lastTrigger.focus({preventScroll:true});}
+function setGraph(open){document.body.classList.toggle('graph-closed',!open);document.body.classList.toggle('mobile-open',open);toggle.setAttribute('aria-expanded',String(open));mobile.setAttribute('aria-expanded',String(open));toggle.textContent=open?'그래프 접기':'그래프 열기';mobile.textContent=open?'Sankey 그래프 접기 ↓':'Sankey 그래프 열기 ↑';if(open)requestAnimationFrame(updateChartZoom);if(!open&&lastTrigger)lastTrigger.focus({preventScroll:true});}
 toggle.onclick=()=>setGraph(document.body.classList.contains('graph-closed'));mobile.onclick=()=>setGraph(!document.body.classList.contains('mobile-open'));document.getElementById('closeGraph').onclick=()=>setGraph(false);document.getElementById('expandGraph').onclick=()=>toggleWideGraph();document.addEventListener('keydown',e=>{if(e.key==='Escape')setGraph(false)});
 
 /* Resizable desktop split pane. On mobile, the existing sheet layout is unchanged. */
