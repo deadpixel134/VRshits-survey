@@ -80,8 +80,8 @@ for (let n = 1; n <= 7; n++) {
   assert(start >= 0 && next > start && next - start > 800,
     'Detailed analysis needs additional comparison and explanation: ' + id);
   const detail = index.slice(start, next);
-  assert(detail.includes('<table>') && detail.includes('가능') || detail.includes('<table>') && detail.includes('해석'),
-    'Detailed analysis should contain cross-group comparisons: ' + id);
+  assert(detail.includes('<table>') && (detail.match(/<p(?:\s[^>]*)?>/g) || []).length >= 3,
+    'Detailed analysis should contain comparisons and multi-paragraph explanations: ' + id);
   assert(idSet.has(id), 'Missing detailed hypothesis: ' + id);
   assert(index.includes('data-detail-link="' + id + '"'), 'Missing navigation link: ' + id);
   assert(payload.detail.includes('id="' + id + '"'), 'Missing exported hypothesis: ' + id);
