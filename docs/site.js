@@ -18,7 +18,7 @@ function setZoom(value,x=chartViewport.clientWidth/2,y=chartViewport.clientHeigh
 }
 function fitGraph(){
  fitToWidth=true;
- setZoom(chartViewport.clientWidth/15);
+ setZoom(Math.floor(chartViewport.clientWidth/75)*5);
  chartViewport.scrollLeft=0;
 }
 zoom.addEventListener('input',()=>{
