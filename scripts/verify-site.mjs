@@ -70,6 +70,13 @@ assert(zoomScript.includes("chartViewport.addEventListener('wheel'") &&
        zoomScript.includes("chartViewport.setPointerCapture") &&
        zoomScript.includes('function fitGraph()'),
        'Missing Sankey zoom and drag navigation logic');
+assert(zoomScript.includes('let fitToWidth=true') && zoomScript.includes('function updateChartZoom()') &&
+       sankeyScript.includes("replaceChildren(svg);updateChartZoom();"),
+       'Sankey should fit to the viewport initially and after filtering');
+assert(sankeyScript.includes('const rightPadding=Math.max(100,Math.ceil(lastLabelWidth+46))') &&
+       sankeyScript.includes('const finalX=W-rightPadding') &&
+       !sankeyScript.includes('W-390'),
+       'Last Sankey column should use label-dependent right padding');
 assert(existsSync(resolve(process.cwd(),'scripts/verify-sankey.mjs')),
        'Missing executable Sankey UI regression tests');
 
