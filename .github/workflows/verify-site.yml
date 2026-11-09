@@ -28,3 +28,5 @@ jobs:
           node --check scripts/verify-site.mjs
       - name: Verify published-site assets and links
         run: node scripts/verify-site.mjs
+      - name: Test Sankey grouping, selection and exports
+        run: node scripts/verify-sankey.mjs
