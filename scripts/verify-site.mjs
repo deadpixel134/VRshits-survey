@@ -24,6 +24,15 @@ const index = pages['index.html'];
 const ids = [...index.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
 assert(index.includes('id="splitter"') && index.includes('role="separator"'),
   'Missing accessible desktop resize separator');
+assert(index.includes('id="returnToReading"'), 'Missing back-to-reading button');
+const siteRouter=read('site.js');
+assert(siteRouter.includes('restoreReading') && siteRouter.includes('scrollY:window.scrollY') &&
+       siteRouter.includes('history.pushState') && siteRouter.includes('scrollTo({top:point.scrollY'),
+       'Missing scroll-position restoration for detail links');
+const communityRouter=read('community.js');
+assert(communityRouter.includes("byId('includeDetail').checked?'href="),
+       'Missing local links when community HTML includes the full detail');
+
 const css = read('style.css');
 const splitLogic = read('site.js');
 assert(css.includes('.splitter{') && css.includes('display:none!important'),
