@@ -25,6 +25,14 @@ const ids = [...index.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
 assert(index.includes('id="splitter"') && index.includes('role="separator"'),
   'Missing accessible desktop resize separator');
 assert(index.includes('id="returnToReading"'), 'Missing back-to-reading button');
+const returnButtonStyle=read('style.css');
+assert(returnButtonStyle.includes('left:50%;transform:translateX(-50%)') &&
+       returnButtonStyle.includes('padding:14px 24px') &&
+       returnButtonStyle.includes('min-height:52px'),
+       'Return-to-reading button must be centered and prominent on desktop');
+assert(returnButtonStyle.includes('bottom:calc(68px + env(safe-area-inset-bottom, 0px))') &&
+       returnButtonStyle.includes('min-height:48px;font-size:15px'),
+       'Return-to-reading button must remain centered and above the mobile Sankey control');
 const siteRouter=read('site.js');
 assert(siteRouter.includes('restoreReading') && siteRouter.includes('scrollY:window.scrollY') &&
        siteRouter.includes('history.pushState') && siteRouter.includes('scrollTo({top:point.scrollY'),
