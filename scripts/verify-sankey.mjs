@@ -224,7 +224,7 @@ viewport.getBoundingClientRect=()=>({left:0,top:0});
 const zoomDoc={getElementById:id=>id==='reading'?null:controls[id],
  querySelector:selector=>selector==='#chart svg'?chartSVG:null};
 const fitAPI=new Function('document','location','URLSearchParams','ResizeObserver',
- siteJS+'\\nreturn {updateChartZoom,fitGraph};')(
+ siteJS+';return {updateChartZoom,fitGraph};')(
  zoomDoc,{search:''},URLSearchParams,undefined);
 fitAPI.updateChartZoom();
 assert.equal(Number(slider.value),36,'Initial chart should fit a 550px viewport');
