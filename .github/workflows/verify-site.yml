@@ -1,0 +1,30 @@
+name: Verify XR survey website
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check docs/site.js
+          node --check docs/sankey.js
+          node --check docs/community.js
+          node --check docs/data.js
+          node --check scripts/verify-site.mjs
+      - name: Verify published-site assets and links
+        run: node scripts/verify-site.mjs
