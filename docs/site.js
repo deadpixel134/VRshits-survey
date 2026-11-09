@@ -1,5 +1,68 @@
-function applyZoom(){const svg=document.querySelector('#chart svg');if(svg)svg.style.width=(1500*Number(document.querySelector('#zoom').value)/100)+'px';}
-const zoom=document.getElementById('zoom');zoom.addEventListener('input',applyZoom);document.getElementById('fit').onclick=()=>{zoom.value=Math.max(40,Math.min(140,(document.getElementById('chart').clientWidth/1500*100)));applyZoom();};
+const zoom=document.getElementById('zoom');
+const chartViewport=document.getElementById('chart');
+const zoomValue=document.getElementById('zoomValue');
+let fitToWidth=false;
+function applyZoom(){
+ const svg=chartViewport.querySelector('svg');
+ if(svg)svg.style.width=(1500*Number(zoom.value)/100)+'px';
+ zoomValue.textContent=Math.round(Number(zoom.value))+'%';
+}
+function setZoom(value,x=chartViewport.clientWidth/2,y=chartViewport.clientHeight/2){
+ const old=Number(zoom.value),min=Number(zoom.min),max=Number(zoom.max);
+ const next=Math.max(min,Math.min(max,Math.round(value/5)*5));
+ if(old===next)return;
+ zoom.value=next;applyZoom();
+ const ratio=next/old;
+ chartViewport.scrollLeft=(chartViewport.scrollLeft+x)*ratio-x;
+ chartViewport.scrollTop=(chartViewport.scrollTop+y)*ratio-y;
+}
+function fitGraph(){
+ fitToWidth=true;
+ setZoom(chartViewport.clientWidth/15);
+ chartViewport.scrollLeft=0;
+}
+zoom.addEventListener('input',()=>{
+ fitToWidth=false;
+ const next=Number(zoom.value);
+ const svg=chartViewport.querySelector('svg');
+ const old=svg?parseFloat(svg.style.width)/15:next;
+ zoom.value=old||next;
+ setZoom(next);
+});
+document.getElementById('fit').onclick=fitGraph;
+document.getElementById('zoomIn').onclick=()=>{fitToWidth=false;setZoom(Number(zoom.value)+10);};
+document.getElementById('zoomOut').onclick=()=>{fitToWidth=false;setZoom(Number(zoom.value)-10);};
+document.getElementById('resetView').onclick=()=>{fitToWidth=false;setZoom(100);chartViewport.scrollLeft=0;chartViewport.scrollTop=0;};
+chartViewport.addEventListener('wheel',event=>{
+ if(!event.ctrlKey)return;
+ event.preventDefault();fitToWidth=false;
+ const r=chartViewport.getBoundingClientRect();
+ setZoom(Number(zoom.value)+(event.deltaY<0?5:-5),event.clientX-r.left,event.clientY-r.top);
+},{passive:false});
+let pan=null;
+chartViewport.addEventListener('pointerdown',event=>{
+ if(event.pointerType!=='mouse'||event.button!==0)return;
+ const background=event.target===chartViewport||event.target.tagName?.toLowerCase()==='svg';
+ if(!background&&!event.altKey)return;
+ pan={id:event.pointerId,x:event.clientX,y:event.clientY,left:chartViewport.scrollLeft,top:chartViewport.scrollTop,moved:false};
+ chartViewport.setPointerCapture(event.pointerId);
+});
+chartViewport.addEventListener('pointermove',event=>{
+ if(!pan||pan.id!==event.pointerId)return;
+ const dx=event.clientX-pan.x,dy=event.clientY-pan.y;
+ if(!pan.moved&&Math.hypot(dx,dy)>5){pan.moved=true;chartViewport.classList.add('is-panning');}
+ if(pan.moved){chartViewport.scrollLeft=pan.left-dx;chartViewport.scrollTop=pan.top-dy;}
+});
+function finishPan(event){
+ if(!pan||pan.id!==event.pointerId)return;
+ if(pan.moved)chartViewport.dataset.dragged='true';
+ pan=null;chartViewport.classList.remove('is-panning');
+ if(chartViewport.hasPointerCapture(event.pointerId))chartViewport.releasePointerCapture(event.pointerId);
+}
+for(const type of ['pointerup','pointercancel','lostpointercapture'])chartViewport.addEventListener(type,finishPan);
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(fitToWidth)fitGraph();}).observe(chartViewport);
+applyZoom();
+
 const reading=document.getElementById('reading');
 if(reading){const panel=document.getElementById('graphPanel'),toggle=document.getElementById('toggleGraph'),mobile=document.getElementById('mobileGraph');let lastTrigger=null;
 function setGraph(open){document.body.classList.toggle('graph-closed',!open);document.body.classList.toggle('mobile-open',open);toggle.setAttribute('aria-expanded',String(open));mobile.setAttribute('aria-expanded',String(open));toggle.textContent=open?'그래프 접기':'그래프 열기';mobile.textContent=open?'Sankey 그래프 접기 ↓':'Sankey 그래프 열기 ↑';if(!open&&lastTrigger)lastTrigger.focus({preventScroll:true});}
