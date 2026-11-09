@@ -55,7 +55,7 @@ class Element{
 const elements={};
 for(const id of ['diagram','group','exclude','scope','gpuLimitControl','gpuLimit','nodeJump','zoom','chart','legend','links','download','selectionInfo','clearSelection'])elements[id]=new Element(id);
 elements.diagram.value='perception';elements.group.value='전체';
-elements.gpuLimit.value='12';elements.zoom.value='100';elements.exclude.checked=true;
+elements.gpuLimit.value='5';elements.zoom.value='100';elements.exclude.checked=true;
 const document={
  getElementById:id=>elements[id],
  createElement:tag=>new Element(tag),
@@ -81,10 +81,46 @@ function assertStageTotals(type,links){
  const original=byStage(DATA.charts[type].전체.links),shown=byStage(links);
  for(const [step,total] of original)assert.equal(shown.get(step),total,type+' stage '+step+' changed respondent totals');
 }
+/* The grouping must be independent per destination, without constructing
+   unsupported HMD/content × GPU × destination respondent-level paths. */
+function assertDestinationGrouping(type,original,view){
+ const stage=type==='perception'?3:2;
+ const result=type==='perception'?'perception':'performance';
+ assert.deepEqual(view.keys,['gpu_destination',result],'Grouped graph should have only the observed GPU→destination link');
+ const observed=new Map();
+ for(const row of original.links.filter(r=>r[0]===stage)){
+  const group=observed.get(row[2])||[];
+  group.push([row[1],row[3]]);
+  observed.set(row[2],group);
+ }
+ const visible=new Map();
+ for(const row of view.links){
+  assert.equal(row[0],1,'New diagram must have only one link stage');
+  const group=visible.get(row[2])||[];
+  group.push(row);
+  visible.set(row[2],group);
+ }
+ assert.deepEqual([...visible.keys()].sort(),[...observed.keys()].sort(),'All destinations retained');
+ for(const [destination,records] of observed){
+  const sorted=[...records].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  const chosen=sorted.slice(0,5),other=sorted.slice(5).reduce((s,x)=>s+x[1],0);
+  const rows=visible.get(destination);
+  assert.equal(rows.length,chosen.length+(other>0?1:0),'Exactly five GPU models (or fewer if unavailable) and the rest at '+destination);
+  for(const [gpu,count] of chosen){
+   const found=rows.find(row=>row[1]===gpu+' · '+destination);
+   assert(found,'Top-five GPU must appear in '+destination+': '+gpu);
+   assert.equal(found[3],count,'Individual GPU count must be exact');
+  }
+  const rest=rows.find(row=>row[1]==='기타 GPU · '+destination);
+  assert.equal(rest?.[3]??0,other,'Other GPUs must be grouped separately at '+destination);
+  assert.equal(rows.reduce((sum,row)=>sum+row[3],0),records.reduce((sum,row)=>sum+row[1],0),
+   'Outcome totals must be unchanged at '+destination);
+ }
+ assert.equal(view.n,original.n,'Respondent denominator must remain unchanged');
+}
 assert.equal(window.sankeyState.n,148);
-assert.equal(window.sankeyState.nodes[2].length,13,'default GPU layer should contain twelve models plus Other');
+assertDestinationGrouping('perception',DATA.charts.perception.전체,window.sankeyState);
 assert(window.sankeyState.links.length<DATA.charts.perception.전체.links.length);
-assertStageTotals('perception',window.sankeyState.links);
 
 const svg=getSVG();
 const path=svg.querySelectorAll('path.link')[0];
@@ -102,11 +138,11 @@ elements.clearSelection.events.click();
 assert.equal(elements.clearSelection.hidden,true);
 assert.equal(svg.querySelectorAll('path.link').filter(p=>p.classes.has('sankey-dim')).length,0);
 
-const gpuOption=elements.nodeJump.children.find(o=>o.value.startsWith('2|')&&o.value!=='2|기타 GPU 모델');
+const gpuOption=elements.nodeJump.children.find(o=>o.value.startsWith('0|')&&!o.value.startsWith('0|기타 GPU · '));
 assert(gpuOption,'expected at least one GPU in the jump menu');
 elements.nodeJump.value=gpuOption.value;
 elements.nodeJump.events.change();
-assert(elements.selectionInfo.textContent.includes('GPU 모델'));
+assert(elements.selectionInfo.textContent.includes('GPU'));
 assert(Number.isFinite(chart.scrollLeft)&&Number.isFinite(chart.scrollTop));
 
 const table=elements.links.children[0];
@@ -119,15 +155,15 @@ elements.gpuLimit.value='all';elements.gpuLimit.events.change();
 assert.equal(window.sankeyState.nodes[2].length,44);
 assert.equal(window.sankeyState.links.length,DATA.charts.perception.전체.links.length);
 
-elements.gpuLimit.value='12';elements.gpuLimit.events.change();
+elements.gpuLimit.value='5';elements.gpuLimit.events.change();
 elements.download.onclick();
 const csv=await exportedBlob.text();
 assert.equal(csv.trim().split(/\r?\n/).length,1+DATA.charts.perception.전체.links.length,
  'CSV must retain original links, not aggregated visual links');
 
 elements.diagram.value='perf';elements.diagram.events.change();
-assertStageTotals('perf',window.sankeyState.links);
-assert(window.sankeyState.nodes[1].length<=13);
+assertDestinationGrouping('perf',DATA.charts.perf.전체,window.sankeyState);
+assert(window.sankeyState.nodes[0].length<=36);
 
 for(const type of ['content','mode']){
  elements.diagram.value=type;elements.diagram.events.change();
@@ -136,4 +172,4 @@ for(const type of ['content','mode']){
  assertStageTotals(type,window.sankeyState.links);
 }
 assert(updated>=5);
-console.log('Sankey UI QA passed: GPU grouping, totals, selection, jump, link rows, CSV and all chart types.');
+console.log('Sankey UI QA passed: destination-specific top-five GPU grouping, exact counts, navigation and original CSV.');
