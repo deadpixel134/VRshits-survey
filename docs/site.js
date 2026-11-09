@@ -109,14 +109,62 @@ splitBar.addEventListener('dblclick',()=>{
 addEventListener('resize',()=>applySplit(splitPercent));
 applySplit(splitPercent);
 
-function view(name){document.querySelectorAll('article').forEach(a=>a.hidden=a.id!==name);document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));const toc=document.getElementById('toc');toc.replaceChildren();document.querySelectorAll('#'+name+' h2').forEach(h=>{const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a)});}
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view(b.dataset.view);history.replaceState(null,'','#'+b.dataset.view);window.scrollTo({top:0,behavior:'smooth'});});
+/* Remember the exact scroll position before following an insight link. */
+const returnButton=document.getElementById('returnToReading');
+let detailReturn=null;
+function view(name){
+  document.querySelectorAll('article').forEach(a=>a.hidden=a.id!==name);
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  const toc=document.getElementById('toc');
+  toc.replaceChildren();
+  document.querySelectorAll('#'+name+' h2').forEach(h=>{
+    const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a);
+  });
+  returnButton.hidden=!(detailReturn&&name==='detailed');
+}
+function restoreReading(updateUrl=true){
+  if(!detailReturn)return;
+  const point=detailReturn;
+  detailReturn=null;
+  if(updateUrl)history.replaceState(null,'',point.url);
+  view('general');
+  requestAnimationFrame(()=>{
+    window.scrollTo({top:point.scrollY,behavior:'auto'});
+    if(point.link?.isConnected)point.link.focus({preventScroll:true});
+  });
+}
+returnButton.addEventListener('click',()=>restoreReading());
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
+  detailReturn=null;
+  view(b.dataset.view);
+  history.replaceState(null,'','#'+b.dataset.view);
+  window.scrollTo({top:0,behavior:'smooth'});
+});
 function isDetailHash(){return /^#(?:detailed|detail-|hypothesis-)/.test(location.hash);}
-function focusDeepLink(smooth=false){const id=decodeURIComponent(location.hash.slice(1));if(!/^(?:hypothesis-0[1-7]|detail-hypotheses|detail-evidence-map|detail-forecast)$/.test(id))return;requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'}));}
+function focusDeepLink(smooth=false){
+  const id=decodeURIComponent(location.hash.slice(1));
+  if(!/^(?:hypothesis-0[1-7]|detail-hypotheses|detail-evidence-map|detail-forecast)$/.test(id))return;
+  requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'}));
+}
 view(isDetailHash()?'detailed':'general');
-document.querySelectorAll('a[data-detail-link]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const id=a.getAttribute('data-detail-link');if(!/^hypothesis-0[1-7]$/.test(id))return;view('detailed');history.pushState(null,'','#'+id);focusDeepLink(true);}));
-window.addEventListener('hashchange',()=>{view(isDetailHash()?'detailed':'general');focusDeepLink();});
+document.querySelectorAll('a[data-detail-link]').forEach(a=>a.addEventListener('click',e=>{
+  e.preventDefault();
+  const id=a.getAttribute('data-detail-link');
+  if(!/^hypothesis-0[1-7]$/.test(id))return;
+  detailReturn={scrollY:window.scrollY,url:location.pathname+location.search+location.hash,link:a};
+  view('detailed');
+  history.pushState(null,'','#'+id);
+  focusDeepLink(true);
+}));
+function handleHistoryNavigation(){
+  if(detailReturn&&!isDetailHash()){restoreReading(false);return;}
+  view(isDetailHash()?'detailed':'general');
+  focusDeepLink();
+}
+window.addEventListener('hashchange',handleHistoryNavigation);
+window.addEventListener('popstate',handleHistoryNavigation);
 if(isDetailHash())focusDeepLink();
+
 document.querySelectorAll('[data-chart]').forEach(b=>b.onclick=()=>{lastTrigger=b;document.getElementById('diagram').value=b.dataset.chart;document.getElementById('group').value=b.closest('article')?.id==='general'&&b.previousElementSibling?.textContent.includes('VRChat')?'VRChat':'전체';setGraph(true);render();});
 if(matchMedia('(max-width:950px)').matches)setGraph(false);else{document.body.classList.remove('graph-closed');document.body.classList.remove('mobile-open');}
 }
