@@ -165,6 +165,17 @@ elements.diagram.value='perf';elements.diagram.events.change();
 assertDestinationGrouping('perf',DATA.charts.perf.전체,window.sankeyState);
 assert(window.sankeyState.nodes[0].length<=36);
 
+// Check every available content filter, including groups with fewer than five GPUs.
+for(const type of ['perception','perf']){
+ elements.diagram.value=type;
+ for(const [group,original] of Object.entries(DATA.charts[type])){
+  elements.group.value=group;
+  elements.group.events.change();
+  assertDestinationGrouping(type,original,window.sankeyState);
+ }
+}
+elements.group.value='전체';
+
 for(const type of ['content','mode']){
  elements.diagram.value=type;elements.diagram.events.change();
  assert.equal(elements.gpuLimitControl.hidden,true,'GPU picker should hide on '+type);
