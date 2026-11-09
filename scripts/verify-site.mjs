@@ -22,6 +22,16 @@ const pageNames = ['index.html', 'sankey.html', 'community.html'];
 const pages = Object.fromEntries(pageNames.map(name => [name, read(name)]));
 const index = pages['index.html'];
 const ids = [...index.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
+assert(index.includes('id="splitter"') && index.includes('role="separator"'),
+  'Missing accessible desktop resize separator');
+const css = read('style.css');
+const splitLogic = read('site.js');
+assert(css.includes('.splitter{') && css.includes('display:none!important'),
+  'Missing desktop splitter styling or mobile hide rule');
+assert(splitLogic.includes('setPointerCapture') && splitLogic.includes('pointercancel') &&
+       splitLogic.includes('ArrowLeft') && splitLogic.includes('ArrowRight') &&
+       splitLogic.includes('savedSplitKey'),
+  'Missing pointer, keyboard, or persisted split resizing behavior');
 assert(new Set(ids).size === ids.length, 'Duplicate IDs in index.html');
 const idSet = new Set(ids);
 
