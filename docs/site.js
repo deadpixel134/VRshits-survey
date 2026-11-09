@@ -150,7 +150,7 @@ view(isDetailHash()?'detailed':'general');
 document.querySelectorAll('a[data-detail-link]').forEach(a=>a.addEventListener('click',e=>{
   e.preventDefault();
   const id=a.getAttribute('data-detail-link');
-  if(!/^hypothesis-0[1-7]$/.test(id))return;
+  if(!/^(?:hypothesis-0[1-7]|detail-hypotheses)$/.test(id))return;
   detailReturn={scrollY:window.scrollY,url:location.pathname+location.search+location.hash,link:a};
   view('detailed');
   history.pushState(null,'','#'+id);
