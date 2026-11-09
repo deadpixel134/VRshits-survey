@@ -32,3 +32,8 @@
  #chart{height:55dvh;min-height:260px}
  .standalone #chart{height:65dvh}
 }
+
+.node-jump-control{display:inline-flex;align-items:center;gap:8px;margin:4px 0 8px;font-size:13px}
+.node-jump-control select{max-width:min(390px,70vw)}
+#links tr[role="button"]{cursor:pointer}
+#links tr[role="button"]:hover,#links tr[role="button"]:focus-visible{background:#ddf1ee;outline:2px solid #318787;outline-offset:-2px}
