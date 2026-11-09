@@ -21,7 +21,7 @@ const gpuLimit=$('gpuLimit');
 const selectionInfo=$('selectionInfo');
 const clearSelection=$('clearSelection');
 const chart=$('chart');
-let currentN=0,rawLinks=[],selectedFocus=null,hoverFocus=null,nodeIndex=[];
+let currentN=0,rawLinks=[],selectedFocus=null,hoverFocus=null,nodeIndex=[],currentConfig=null;
 /* Group the GPU→destination observations independently for each destination.
    Do NOT connect upstream HMD/content categories to those per-destination GPU nodes:
    only adjacent-pair aggregates are available, not respondent-level full paths. */
@@ -108,7 +108,7 @@ function chooseFocus(focus){
    (r[0]===selectedFocus.layer&&r[2]===selectedFocus.name)
   ).sort((a,b)=>b[3]-a[3]);
   const examples=related.slice(0,3).map(r=>(r[1]===selectedFocus.name?r[2]:r[1])+' '+r[3]+'명').join(' · ');
-  selectionInfo.textContent=cfg[$('diagram').value].titles[selectedFocus.layer]+' · '+selectedFocus.name+
+  selectionInfo.textContent=currentConfig.titles[selectedFocus.layer]+' · '+selectedFocus.name+
    ': '+count+'명 ('+(currentN?(count/currentN*100).toFixed(1):0)+'%)'+
    (examples?' | 주요 연결: '+examples:'');
  }
@@ -120,7 +120,7 @@ function resetSelection(){
 }
 
 function el(tag,attrs={},text){const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;}
-function render(){const type=$('diagram').value;const original=DATA.charts[type][$('group').value+(type==='content'&&!$('exclude').checked?'|all':'')];const selected=displaySubset(original,type);const c=selected.viewConfig;const n=selected.n;currentN=n;rawLinks=original.links.map(r=>[r[0],r[1],r[2],r[3],n]);$('gpuLimitControl').hidden=!cfg[type].keys.includes('gpu');$('exclude').parentElement.hidden=type!=='content';
+function render(){const type=$('diagram').value;const original=DATA.charts[type][$('group').value+(type==='content'&&!$('exclude').checked?'|all':'')];const selected=displaySubset(original,type);const c=selected.viewConfig;currentConfig=c;const n=selected.n;currentN=n;rawLinks=original.links.map(r=>[r[0],r[1],r[2],r[3],n]);$('gpuLimitControl').hidden=!cfg[type].keys.includes('gpu');$('exclude').parentElement.hidden=type!=='content';
 $('scope').textContent=`현재 도표 분모 n=${n}. ${type==='perception'?'본인 PC 사양에 대한 주관적 평가(상옵·중옵·하옵·겨우). 측정 FPS나 실제 게임 옵션이 아닙니다.':type==='perf'?'PC 성능 주분석 대상, 성능 모름 포함.':type==='mode'?'PCVR 우세 / 비슷하게 사용 / Standalone 우세. 전체 148명 기준.':type==='content'?'2026 응답자의 회고값이며 2025 표본 추적이 아님.':type==='hmd'?'교체와 추가 병행을 포함. 유지값은 파생이며 신규 입문은 별도.':'주력 콘텐츠 기준. GPU 원문 모델은 통합하지 않음.'}`;
 if(c.keys.includes('gpu_destination'))$('scope').textContent+=' GPU→목적지의 실제 연결 인원을 기준으로 각 목적지별 상위 5종과 나머지를 따로 표시합니다. 앞단 HMD·콘텐츠와의 연계는 전체 흐름 모드에서 확인하세요.';
 const ordered={perception:['상옵','중옵','하옵','겨우'],performance:['여유','대체로 유지','가끔 저하·플레이 가능','잦은 저하','설정 크게 낮춤','플레이 어려움','모름']};
