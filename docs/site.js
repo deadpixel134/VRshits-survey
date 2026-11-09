@@ -13,8 +13,8 @@ function setZoom(value,x=chartViewport.clientWidth/2,y=chartViewport.clientHeigh
  if(old===next)return;
  zoom.value=next;applyZoom();
  const ratio=next/old;
- chartViewport.scrollLeft=(chartViewport.scrollLeft+x)*ratio-x;
- chartViewport.scrollTop=(chartViewport.scrollTop+y)*ratio-y;
+ chartViewport.scrollLeft=Math.max(0,(chartViewport.scrollLeft+x)*ratio-x);
+ chartViewport.scrollTop=Math.max(0,(chartViewport.scrollTop+y)*ratio-y);
 }
 function fitGraph(){
  fitToWidth=true;
@@ -51,7 +51,7 @@ chartViewport.addEventListener('pointermove',event=>{
  if(!pan||pan.id!==event.pointerId)return;
  const dx=event.clientX-pan.x,dy=event.clientY-pan.y;
  if(!pan.moved&&Math.hypot(dx,dy)>5){pan.moved=true;chartViewport.classList.add('is-panning');}
- if(pan.moved){chartViewport.scrollLeft=pan.left-dx;chartViewport.scrollTop=pan.top-dy;}
+ if(pan.moved){chartViewport.scrollLeft=Math.max(0,pan.left-dx);chartViewport.scrollTop=Math.max(0,pan.top-dy);}
 });
 function finishPan(event){
  if(!pan||pan.id!==event.pointerId)return;
