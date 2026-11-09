@@ -74,6 +74,14 @@ const generalExportCount = (payload.general.match(/class="interpretation"/g) || 
 assert(insightCount === 7 && generalExportCount === 7, 'Expected seven general interpretations');
 for (let n = 1; n <= 7; n++) {
   const id = 'hypothesis-0' + n;
+  const start = index.indexOf('<h3 id="' + id + '">');
+  const next = n === 7 ? index.indexOf('<h3 id="detail-evidence-map">', start)
+    : index.indexOf('<h3 id="hypothesis-0' + (n + 1) + '">', start);
+  assert(start >= 0 && next > start && next - start > 800,
+    'Detailed analysis needs additional comparison and explanation: ' + id);
+  const detail = index.slice(start, next);
+  assert(detail.includes('<table>') && detail.includes('가능') || detail.includes('<table>') && detail.includes('해석'),
+    'Detailed analysis should contain cross-group comparisons: ' + id);
   assert(idSet.has(id), 'Missing detailed hypothesis: ' + id);
   assert(index.includes('data-detail-link="' + id + '"'), 'Missing navigation link: ' + id);
   assert(payload.detail.includes('id="' + id + '"'), 'Missing exported hypothesis: ' + id);
