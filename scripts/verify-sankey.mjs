@@ -67,7 +67,7 @@ const blobURL={
  createObjectURL(blob){exportedBlob=blob;return 'blob:mock';},
  revokeObjectURL(){}
 };
-new Function('document','window','DATA','applyZoom','CSS','URL','Blob',sankey)(
+new Function('document','window','DATA','updateChartZoom','CSS','URL','Blob',sankey)(
  document,window,DATA,()=>{updated++;},{escape:s=>s},blobURL,Blob
 );
 const chart=elements.chart;
@@ -129,6 +129,12 @@ assertOriginalView('perception','전체',window.sankeyState);
 assert.equal(window.sankeyState.nodes[2].length,44,'Default view must show all 44 GPUs');
 
 const svg=getSVG();
+const rightmostRect=svg.querySelectorAll('[data-node-layer]').find(el=>
+ el.tagName==='rect'&&el.dataset.nodeLayer==='3');
+assert(rightmostRect,'Expected nodes in last Sankey column');
+assert(Number(rightmostRect.getAttribute('x'))>1250,
+ 'Rightmost column must no longer sit at the old 1140px with a 360px gutter');
+
 const path=svg.querySelectorAll('path.link')[0];
 chart.events.click({target:path});
 assert.equal(svg.querySelectorAll('path.link').filter(p=>p.classes.has('sankey-active')).length,1);
@@ -193,5 +199,46 @@ for(const type of ['content','mode']){
  assert.equal(window.sankeyState.links.length,DATA.charts[type].전체.links.length);
  assertStageTotals(type,window.sankeyState.links);
 }
+// All chart configurations keep the last column toward the right boundary.
+for(const type of ['content','perception','perf','mode']){
+ elements.diagram.value=type;elements.diagram.events.change();
+ const svg=getSVG();
+ const last=window.sankeyState.keys.length-1;
+ const rect=svg.querySelectorAll('[data-node-layer]').find(node=>
+  node.tagName==='rect'&&node.dataset.nodeLayer===String(last));
+ assert(rect,'Expected a rightmost node in '+type);
+ const endX=Number(rect.getAttribute('x'));
+ assert(endX>=1190&&endX<=1410,'Last column should leave only label-dependent padding in '+type+' (got '+endX+')');
+}
+
+// Exercise real site.js zoom controller in a standalone-like DOM.
+const siteJS=readFileSync('docs/site.js','utf8');
+const controls=Object.fromEntries(['zoom','chart','zoomValue','zoomIn','zoomOut','fit','resetView','diagram']
+ .map(id=>[id,new Element(id)]));
+const [slider,viewport]=[controls.zoom,controls.chart];
+slider.value='100';slider.min='20';slider.max='200';slider.step='1';
+viewport.clientWidth=550;viewport.clientHeight=500;
+const chartSVG={style:{width:'1500px'}};
+viewport.querySelector=selector=>selector==='svg'?chartSVG:null;
+viewport.getBoundingClientRect=()=>({left:0,top:0});
+const zoomDoc={getElementById:id=>id==='reading'?null:controls[id],
+ querySelector:selector=>selector==='#chart svg'?chartSVG:null};
+const fitAPI=new Function('document','location','URLSearchParams','ResizeObserver',
+ siteJS+'\\nreturn {updateChartZoom,fitGraph};')(
+ zoomDoc,{search:''},URLSearchParams,undefined);
+fitAPI.updateChartZoom();
+assert.equal(Number(slider.value),36,'Initial chart should fit a 550px viewport');
+assert.equal(chartSVG.style.width,'540px','SVG width should be close to viewport');
+controls.zoomIn.onclick();
+assert.equal(Number(slider.value),46,'User should be able to zoom manually');
+viewport.clientWidth=850;
+fitAPI.updateChartZoom();
+assert.equal(Number(slider.value),46,'Changing chart should preserve manual zoom');
+controls.fit.onclick();
+assert.equal(Number(slider.value),56,'Fit action should adapt to an 850px viewport');
+viewport.clientWidth=700;
+fitAPI.updateChartZoom();
+assert.equal(Number(slider.value),46,'Later chart renders should automatically refit after explicit Fit');
+
 assert(updated>=5);
 console.log('Sankey UI QA passed: all GPU models by default, optional top 12/20 grouping, original links and CSV.');
