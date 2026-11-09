@@ -23,6 +23,8 @@ function fitGraph(){
  if(width<=0)return; // Hidden mobile sheet: fit when it becomes visible.
  const percentage=Math.floor((width-8)/1500*100);
  setZoom(percentage);
+ // A newly rendered SVG needs this width even when the fit percentage is unchanged.
+ applyZoom();
  chartViewport.scrollLeft=0;
 }
 function updateChartZoom(){
