@@ -74,15 +74,56 @@ if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(fitToWidth)fit
 applyZoom();
 
 const reading=document.getElementById('reading');
-if(reading){const panel=document.getElementById('graphPanel'),toggle=document.getElementById('toggleGraph'),mobile=document.getElementById('mobileGraph');let lastTrigger=null;
-function setGraph(open){document.body.classList.toggle('graph-closed',!open);document.body.classList.toggle('mobile-open',open);toggle.setAttribute('aria-expanded',String(open));mobile.setAttribute('aria-expanded',String(open));toggle.textContent=open?'그래프 접기':'그래프 열기';mobile.textContent=open?'Sankey 그래프 접기 ↓':'Sankey 그래프 열기 ↑';if(open)requestAnimationFrame(updateChartZoom);if(!open&&lastTrigger)lastTrigger.focus({preventScroll:true});}
-toggle.onclick=()=>setGraph(document.body.classList.contains('graph-closed'));mobile.onclick=()=>setGraph(!document.body.classList.contains('mobile-open'));document.getElementById('closeGraph').onclick=()=>setGraph(false);document.getElementById('expandGraph').onclick=()=>toggleWideGraph();document.addEventListener('keydown',e=>{if(e.key==='Escape')setGraph(false)});
+if (reading) {
+const toggle = document.getElementById('toggleGraph');
+const mobile = document.getElementById('mobileGraph');
+let lastTrigger = null;
+const desktopSplit=matchMedia('(min-width:951px)');
+const masthead = document.querySelector('.top');
+
+function syncReadingAccess(open) {
+  const sheetOpen = open && !desktopSplit.matches;
+  reading.inert = sheetOpen;
+  masthead.inert = sheetOpen;
+  document.body.classList.toggle('sheet-open', sheetOpen);
+}
+
+function setGraph(open, trigger) {
+  if (trigger) lastTrigger = trigger;
+  document.body.classList.toggle('graph-closed', !open);
+  document.body.classList.toggle('mobile-open', open);
+  syncReadingAccess(open);
+  for (const control of [toggle, mobile]) {
+    control.setAttribute('aria-expanded', String(open));
+    control.textContent = open ? '응답 흐름도 닫기' : '응답 흐름도 열기';
+  }
+  if (open) {
+    requestAnimationFrame(() => {
+      updateChartZoom();
+      if (trigger) document.getElementById('diagram').focus();
+    });
+  } else if (lastTrigger) {
+    const focusTarget = lastTrigger.getClientRects().length
+      ? lastTrigger : desktopSplit.matches ? toggle : mobile;
+    focusTarget.focus({preventScroll:true});
+    lastTrigger = null;
+  }
+}
+const isGraphOpen = () => !document.body.classList.contains('graph-closed');
+toggle.onclick = () => setGraph(!isGraphOpen(), isGraphOpen() ? null : toggle);
+mobile.onclick = () => setGraph(!isGraphOpen(), isGraphOpen() ? null : mobile);
+document.getElementById('closeGraph').onclick = () => setGraph(false, lastTrigger || (desktopSplit.matches ? toggle : mobile));
+document.getElementById('expandGraph').onclick = () => toggleWideGraph();
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !event.defaultPrevented && isGraphOpen()) {
+    setGraph(false, lastTrigger || (desktopSplit.matches ? toggle : mobile));
+  }
+});
 
 /* Resizable desktop split pane. On mobile, the existing sheet layout is unchanged. */
 const splitBar=document.getElementById('splitter');
 const splitLayout=document.querySelector('.layout');
 const wideButton=document.getElementById('expandGraph');
-const desktopSplit=matchMedia('(min-width:951px)');
 const savedSplitKey='xr-survey-split-width-v1';
 const defaultSplit=54;
 const minPaneWidth=320;
@@ -185,13 +226,46 @@ applySplit(splitPercent);
 /* Remember the exact scroll position before following an insight link. */
 const returnButton=document.getElementById('returnToReading');
 let detailReturn=null;
+let sectionHeadings = [];
+let activeTocLink;
+let pendingSectionUpdate = false;
+function updateReadingSection() {
+  pendingSectionUpdate = false;
+  const top = masthead.getBoundingClientRect().bottom + 35;
+  let current;
+  for (const heading of sectionHeadings) {
+    if (heading.getBoundingClientRect().top > top) break;
+    current = heading;
+  }
+  const link = current && document.querySelector('#toc a[href="#' + current.id + '"]');
+  if (link === activeTocLink) return;
+  activeTocLink?.removeAttribute('aria-current');
+  link?.setAttribute('aria-current', 'location');
+  activeTocLink = link;
+}
+function scheduleSectionUpdate() {
+  if (!pendingSectionUpdate) {
+    pendingSectionUpdate = true;
+    requestAnimationFrame(updateReadingSection);
+  }
+}
+window.addEventListener('scroll', scheduleSectionUpdate, {passive: true});
+window.addEventListener('resize', scheduleSectionUpdate);
 function view(name){
+  document.getElementById('overviewIntro').hidden = name !== 'general';
+  document.getElementById('detailIntro').hidden = name !== 'detailed';
   document.querySelectorAll('article').forEach(a=>a.hidden=a.id!==name);
-  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+  document.querySelectorAll('[data-view]').forEach(button=>{
+    const selected=button.dataset.view===name;
+    button.classList.toggle('active',selected);
+    button.setAttribute('aria-pressed',String(selected));
+  });
   const toc=document.getElementById('toc');
   toc.replaceChildren();
-  document.querySelectorAll('#'+name+' h2').forEach(h=>{
-    const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;toc.append(a);
+  sectionHeadings = document.querySelectorAll('#'+name+' :is(h2,h3)[id]');
+  scheduleSectionUpdate();
+  sectionHeadings.forEach(h=>{
+    const a=document.createElement('a');a.href='#'+h.id;a.textContent=h.textContent;a.className=h.tagName==='H3'?'subtopic':'topic';toc.append(a);
   });
   returnButton.hidden=!(detailReturn&&name==='detailed');
 }
@@ -211,20 +285,26 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{
   detailReturn=null;
   view(b.dataset.view);
   history.replaceState(null,'','#'+b.dataset.view);
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo({top:0,behavior:'auto'});
 });
 function isDetailHash(){return /^#(?:detailed|detail-|hypothesis-)/.test(location.hash);}
 function focusDeepLink(smooth=false){
-  const id=decodeURIComponent(location.hash.slice(1));
-  if(!/^(?:hypothesis-0[1-7]|detail-hypotheses|detail-evidence-map|detail-forecast)$/.test(id))return;
-  requestAnimationFrame(()=>document.getElementById(id)?.scrollIntoView({behavior:smooth?'smooth':'auto',block:'start'}));
+  const id = location.hash.slice(1);
+  if (!/^(?:general-|detail-|hypothesis-)[a-z0-9-]+$/.test(id)) return;
+  requestAnimationFrame(() => {
+    const target = document.getElementById(id);
+    if (!target || target.closest('[hidden]')) return;
+    target.tabIndex = -1;
+    target.focus({preventScroll:true});
+    target.scrollIntoView({behavior:smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'auto',block:'start'});
+  });
 }
 view(isDetailHash()?'detailed':'general');
-document.querySelectorAll('a[data-detail-link]').forEach(a=>a.addEventListener('click',e=>{
+document.querySelectorAll('a[data-detail-link], .question-jump a[href^="#detail-"]').forEach(a=>a.addEventListener('click',e=>{
   e.preventDefault();
-  const id=a.getAttribute('data-detail-link');
-  if(!/^(?:hypothesis-0[1-7]|detail-hypotheses)$/.test(id))return;
-  detailReturn={scrollY:window.scrollY,url:location.pathname+location.search+location.hash,link:a};
+  const id = a.dataset.detailLink || a.hash.slice(1);
+  if (!document.getElementById(id)) return;
+  if (!isDetailHash()) detailReturn={scrollY:window.scrollY,url:location.pathname+location.search+location.hash,link:a};
   view('detailed');
   history.pushState(null,'','#'+id);
   focusDeepLink(true);
@@ -236,9 +316,22 @@ function handleHistoryNavigation(){
 }
 window.addEventListener('hashchange',handleHistoryNavigation);
 window.addEventListener('popstate',handleHistoryNavigation);
-if(isDetailHash())focusDeepLink();
+if(location.hash==='#general'||location.hash==='#detailed'){
+  window.addEventListener('load',()=>requestAnimationFrame(()=>window.scrollTo(0,0)),{once:true});
+}else if(location.hash)focusDeepLink();
 
-document.querySelectorAll('[data-chart]').forEach(b=>b.onclick=()=>{lastTrigger=b;document.getElementById('diagram').value=b.dataset.chart;document.getElementById('group').value=b.closest('article')?.id==='general'&&b.previousElementSibling?.textContent.includes('VRChat')?'VRChat':'전체';setGraph(true);render();});
-if(matchMedia('(max-width:950px)').matches)setGraph(false);else{document.body.classList.remove('graph-closed');document.body.classList.remove('mobile-open');}
+document.querySelectorAll('[data-chart]').forEach(b=>b.onclick=()=>{document.getElementById('diagram').value=b.dataset.chart;document.getElementById('group').value=b.closest('article')?.id==='general'&&b.previousElementSibling?.textContent.includes('VRChat')?'VRChat':'전체';setGraph(true,b);render();});
+setGraph(new URLSearchParams(location.search).has('chart'));
+const contents=document.querySelector('.toc');
+contents.open=desktopSplit.matches;
+desktopSplit.addEventListener('change', event => {
+  contents.open = event.matches;
+  if (beforeWide !== null) applySplit(beforeWide);
+  clearWide();
+  syncReadingAccess(isGraphOpen());
+});
+contents.addEventListener('click',event=>{
+  if(!desktopSplit.matches && event.target.closest('a'))contents.open=false;
+});
 }
 const initialChart=new URLSearchParams(location.search).get('chart');if(['content','perception','perf','mode'].includes(initialChart))document.getElementById('diagram').value=initialChart;

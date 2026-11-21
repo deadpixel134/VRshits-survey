@@ -1,5 +1,15 @@
 const $=id=>document.getElementById(id), NS='http://www.w3.org/2000/svg';
-const cfg={perception:{keys:['content','gpu_vendor','gpu','perception'],titles:['주력 콘텐츠','GPU 제조사','GPU 모델','사양 체감']},content:{keys:['previous_content','content'],titles:['1년 전 콘텐츠','현재 콘텐츠']},perf:{keys:['hmd','gpu','performance'],titles:['주력 HMD','exact GPU','전반적 VR 성능']},mode:{keys:['hmd','mode'],titles:['주력 HMD','사용 비중']}};
+const chartDetails = {
+ perception: '주로 하는 콘텐츠에서 그래픽카드(GPU) 모델과 그래픽 설정 체감으로 이어집니다. 사양 체감은 응답자가 고른 설정 수준입니다.',
+ content: '2026년 설문에서 당시 주력 콘텐츠와 1년 전을 떠올려 답한 주력 콘텐츠를 비교합니다.',
+ perf: '주력 헤드셋(HMD)과 그래픽카드(GPU)별 성능 체감입니다. 성능은 응답자가 고른 주사율 유지 수준입니다.',
+ mode: '헤드셋(HMD)별 PC 연결 사용(PCVR)과 헤드셋 단독 사용(Standalone)의 상대적 비중입니다.'
+};
+const selectionPrompt = '항목이나 연결선을 선택하면 인원과 관련 응답을 표시합니다.';
+function respondentShare(count) {
+ return count+' / '+currentN+'명 ('+(currentN ? (count/currentN*100).toFixed(1) : '0.0')+'%)';
+}
+const cfg={perception:{keys:['content','gpu_vendor','gpu','perception'],titles:['주력 콘텐츠','GPU 제조사','GPU 모델','사양 체감']},content:{keys:['previous_content','content'],titles:['1년 전 콘텐츠','현재 콘텐츠']},perf:{keys:['hmd','gpu','performance'],titles:['주력 HMD','GPU 모델','전반적 VR 성능']},mode:{keys:['hmd','mode'],titles:['주력 HMD','사용 비중']}};
 const fixed={'VRChat':'#7950b8','리듬게임':'#d48800','FPS·슈팅·액션':'#ca5155','시뮬레이션':'#168b87','VR MOD':'#3779bf','기타 콘텐츠':'#788391','NVIDIA':'#57932b','AMD':'#c7464a','Intel':'#267fcb','상옵':'#17827b','중옵':'#397bb9','하옵':'#cf8a23','겨우':'#c34c58','여유':'#17827b','대체로 유지':'#397bb9','가끔 저하·플레이 가능':'#8c78b8','설정 크게 낮춤':'#c48b26','잦은 저하':'#d46a3a','플레이 어려움':'#b83c55','모름':'#89929c','PCVR 우세':'#3779bf','Standalone 우세':'#168b87','비슷하게 사용':'#9572bb'};
 const colorMaps={};
 function family(k){return k==='previous_hmd'?'hmd':k==='previous_content'?'content':k;}
@@ -81,13 +91,13 @@ function chooseFocus(focus){
  clearSelection.hidden=!selectedFocus;
  $('nodeJump').value=selectedFocus?.kind==='node'?selectedFocus.layer+'|'+selectedFocus.name:'';
  if(!selectedFocus){
-  selectionInfo.textContent='항목이나 연결선을 선택하면 인원과 관련 흐름을 표시합니다.';
+  selectionInfo.textContent=selectionPrompt;
   return;
  }
  if(selectedFocus.kind==='link'){
   const row=currentLinks.find(r=>r[0]===selectedFocus.stage&&r[1]===selectedFocus.source&&r[2]===selectedFocus.target);
   const count=row?.[3]??0;
-  selectionInfo.textContent=selectedFocus.source+' → '+selectedFocus.target+' : '+count+'명 ('+(currentN?(count/currentN*100).toFixed(1):0)+'%)';
+  selectionInfo.textContent=selectedFocus.source+' → '+selectedFocus.target+' : '+respondentShare(count);
  }else{
   const hit=chart.querySelector('svg [data-node-layer="'+selectedFocus.layer+'"][data-node-name="'+CSS.escape(selectedFocus.name)+'"]');
   const count=Number(hit?.dataset.nodeCount||0);
@@ -97,18 +107,31 @@ function chooseFocus(focus){
   ).sort((a,b)=>b[3]-a[3]);
   const examples=related.slice(0,3).map(r=>(r[1]===selectedFocus.name?r[2]:r[1])+' '+r[3]+'명').join(' · ');
   selectionInfo.textContent=currentConfig.titles[selectedFocus.layer]+' · '+selectedFocus.name+
-   ': '+count+'명 ('+(currentN?(count/currentN*100).toFixed(1):0)+'%)'+
+   ': '+respondentShare(count)+
    (examples?' | 주요 연결: '+examples:'');
  }
 }
 function resetSelection(){
  selectedFocus=null;hoverFocus=null;highlight(null);
  clearSelection.hidden=true;$('nodeJump').value='';
- selectionInfo.textContent='항목이나 연결선을 선택하면 인원과 관련 흐름을 표시합니다.';
+ selectionInfo.textContent=selectionPrompt;
 }
 
 function el(tag,attrs={},text){const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;}
 function render(){const type=$('diagram').value;const original=DATA.charts[type][$('group').value+(type==='content'&&!$('exclude').checked?'|all':'')];const selected=displaySubset(original,type);const c=cfg[type];currentConfig=c;const n=selected.n;currentN=n;rawLinks=original.links.map(r=>[r[0],r[1],r[2],r[3],n]);$('gpuLimitControl').hidden=!cfg[type].keys.includes('gpu');$('exclude').parentElement.hidden=type!=='content';
+const base = $('chartBase');
+if (base) base.textContent = '2026년 · '+$('group').value+' · 현재 분모 '+n+'명';
+const context = $('chartContext');
+if (context) {
+ const gpuNote = c.keys.includes('gpu') ? ' GPU는 3DMark Steel Nomad 점수 순으로 표시합니다.' : '';
+ context.textContent = chartDetails[type]+gpuNote;
+}
+const standaloneLink = $('standaloneGraphLink');
+if (standaloneLink) {
+ const params = new URLSearchParams({chart:type,group:$('group').value,gpu:gpuLimit.value});
+ if (!$('exclude').checked) params.set('recall','all');
+ standaloneLink.href = 'sankey.html?'+params;
+}
 const ordered={perception:['상옵','중옵','하옵','겨우'],performance:['여유','대체로 유지','가끔 저하·플레이 가능','잦은 저하','설정 크게 낮춤','플레이 어려움','모름']};
 const compare=(k,a,b)=>k==='gpu'
  ?(DATA.gpuScores[b[0]]??-1)-(DATA.gpuScores[a[0]]??-1)||a[0].localeCompare(b[0])
@@ -126,7 +149,7 @@ const lastLabelWidth=Math.max(estimateLabelWidth(c.titles.at(-1)),
  ...rightLayer.map(node=>estimateLabelWidth(node.name+' · '+node.value)));
 const rightPadding=Math.max(100,Math.ceil(lastLabelWidth+46));
 const finalX=W-rightPadding;
-const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:W,height:H,role:'img','aria-label':c.titles.join(' → ')});const maps=layers.map((layer,i)=>{const total=n*scale+(layer.length-1)*gap;let y=top+(H-top-bottom-total)/2;const x=30+i*(finalX-30)/(layers.length-1);svg.append(el('text',{x,y:30,'font-size':17,'font-weight':700,fill:'#23364d'},c.titles[i]));const m=new Map;for(const node of layer){node.x=x;node.y=y;node.h=node.value*scale;y+=node.h+gap;m.set(node.name,node);}return m;});nodeIndex=layers.flat();
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:W,height:H,role:'group','aria-label':c.titles.join(' → ')+' · '+n+'명'});const maps=layers.map((layer,i)=>{const total=n*scale+(layer.length-1)*gap;let y=top+(H-top-bottom-total)/2;const x=30+i*(finalX-30)/(layers.length-1);svg.append(el('text',{x,y:30,'font-size':17,'font-weight':700,fill:'#23364d'},c.titles[i]));const m=new Map;for(const node of layer){node.x=x;node.y=y;node.h=node.value*scale;y+=node.h+gap;m.set(node.name,node);}return m;});nodeIndex=layers.flat();
 const picker=$('nodeJump');picker.replaceChildren();
 const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='항목 선택…';picker.append(placeholder);
 for(const node of nodeIndex){
@@ -134,12 +157,12 @@ for(const node of nodeIndex){
  opt.textContent=c.titles[node.layer]+' · '+node.name+' ('+node.value+'명)';
  picker.append(opt);
 }currentLinks=[];
-for(let i=0;i<c.keys.length-1;i++){const links=selected.links.filter(l=>l[0]===i+1).map(l=>({names:[l[1],l[2]],value:l[3]})).sort((a,b)=>maps[i].get(a.names[0]).y-maps[i].get(b.names[0]).y||maps[i+1].get(a.names[1]).y-maps[i+1].get(b.names[1]).y);for(const l of links){const a=maps[i].get(l.names[0]),b=maps[i+1].get(l.names[1]),h=l.value*scale,x1=a.x+16,x2=b.x,y1=a.y+a.outOff,y2=b.y+b.inOff,midx=(x1+x2)/2;a.outOff+=h;b.inOff+=h;const path=el('path',{d:`M${x1},${y1} C${midx},${y1} ${midx},${y2} ${x2},${y2} L${x2},${y2+h} C${midx},${y2+h} ${midx},${y1+h} ${x1},${y1+h} Z`,fill:color(c.keys[i],a.name),opacity:.42,class:'link','data-stage':i+1,'data-source':a.name,'data-target':b.name,tabindex:-1});path.append(el('title',{},`${a.name} → ${b.name}: ${l.value}명 (${n?(l.value/n*100).toFixed(1):0}%)`));svg.append(path);currentLinks.push([i+1,a.name,b.name,l.value,n]);}}
+for(let i=0;i<c.keys.length-1;i++){const links=selected.links.filter(l=>l[0]===i+1).map(l=>({names:[l[1],l[2]],value:l[3]})).sort((a,b)=>maps[i].get(a.names[0]).y-maps[i].get(b.names[0]).y||maps[i+1].get(a.names[1]).y-maps[i+1].get(b.names[1]).y);for(const l of links){const a=maps[i].get(l.names[0]),b=maps[i+1].get(l.names[1]),h=l.value*scale,x1=a.x+16,x2=b.x,y1=a.y+a.outOff,y2=b.y+b.inOff,midx=(x1+x2)/2;a.outOff+=h;b.inOff+=h;const path=el('path',{d:`M${x1},${y1} C${midx},${y1} ${midx},${y2} ${x2},${y2} L${x2},${y2+h} C${midx},${y2+h} ${midx},${y1+h} ${x1},${y1+h} Z`,fill:'#537e78',opacity:.28,class:'link','data-stage':i+1,'data-source':a.name,'data-target':b.name,tabindex:-1});path.append(el('title',{},`${a.name} → ${b.name}: ${l.value}명 (${n?(l.value/n*100).toFixed(1):0}%)`));svg.append(path);currentLinks.push([i+1,a.name,b.name,l.value,n]);}}
 for(const layer of layers)for(const node of layer){svg.append(el('rect',{x:node.x,y:node.y,width:16,height:node.h,rx:2,fill:color(c.keys[node.layer],node.name),'data-category':node.name,'data-node-layer':node.layer,'data-node-name':node.name,'data-node-count':node.value,tabindex:0,role:'button','aria-label':`${node.name}, ${node.value}명`}));const label=el('text',{x:node.x+22,y:node.y+node.h/2+4,'font-size':14,fill:'#172b40','data-node-layer':node.layer,'data-node-name':node.name,'data-node-count':node.value});const full=`${node.name} · ${node.value}`;label.textContent=full.length>39?full.slice(0,37)+'…':full;label.append(el('title',{},full));svg.append(label);}
 if(!n)svg.append(el('text',{x:40,y:100},'선택 조건에 해당하는 응답이 없습니다.'));$('chart').replaceChildren(svg);updateChartZoom();resetSelection();$('legend').replaceChildren();for(const layer of layers){const box=document.createElement('div');box.style.margin='10px 0';const title=document.createElement('strong');title.textContent=c.titles[layer[0]?.layer||0]+' ';box.append(title);for(const node of layer){const item=document.createElement('span');item.style.cssText='display:inline-flex;align-items:center;gap:5px;margin:3px 12px 3px 0;font-size:13px';const swatch=document.createElement('i');swatch.style.cssText='display:inline-block;width:12px;height:12px;background:'+color(c.keys[node.layer],node.name);item.append(swatch,document.createTextNode(node.name));box.append(item);}$('legend').append(box);}
-const t=document.createElement('table');const tr=document.createElement('tr');for(const h of ['단계','출발','도착','인원','분모']){const th=document.createElement('th');th.textContent=h;tr.append(th);}t.append(tr);for(const r of currentLinks){
+const t=document.createElement('table');const tr=document.createElement('tr');for(const h of ['단계','출발','도착','인원','분모']){const th=document.createElement('th');th.scope='col';th.textContent=h;tr.append(th);}t.append(tr);for(const r of currentLinks){
  const tr=document.createElement('tr');tr.tabIndex=0;tr.setAttribute('role','button');
- tr.setAttribute('aria-label',r[1]+'에서 '+r[2]+'로 '+r[3]+'명');
+ tr.setAttribute('aria-label',r[1]+'에서 '+r[2]+'로 '+respondentShare(r[3]));
  const selectRow=()=>chooseFocus({kind:'link',stage:r[0],source:r[1],target:r[2]});
  tr.addEventListener('click',selectRow);
  tr.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectRow();}});
@@ -157,7 +180,17 @@ $('nodeJump').addEventListener('change',()=>{
  chart.scrollLeft=Math.max(0,(node.x+8)*scale-chart.clientWidth/2);
  chart.scrollTop=Math.max(0,(node.y+node.h/2)*scale-chart.clientHeight/2);
 });
-$('download').onclick=()=>{const csv='\uFEFF'+[['stage','source','target','n','base'],...rawLinks].map(r=>r.map(x=>'"'+String(x).replaceAll('"','""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='sankey_links.csv';a.click();URL.revokeObjectURL(a.href);};render();
+$('download').onclick=()=>{const csv='\uFEFF'+[['stage','source','target','n','base'],...rawLinks].map(r=>r.map(x=>'"'+String(x).replaceAll('"','""')+'"').join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='sankey_links.csv';a.click();URL.revokeObjectURL(a.href);};
+const chartParams = typeof location === 'undefined' ? null : new URLSearchParams(location.search);
+if (chartParams) {
+ for (const [id, key] of [['group','group'],['gpuLimit','gpu']]) {
+  const control = $(id);
+  const value = chartParams.get(key);
+  if ([...control.options].some(option => option.value === value)) control.value = value;
+ }
+ if (chartParams.get('recall') === 'all') $('exclude').checked = false;
+}
+render();
 
 
 chart.addEventListener('click',event=>{
