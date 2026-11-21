@@ -12,6 +12,7 @@
 <div class="layout"><main id="reading" tabindex="-1">
 <header class="intro" id="overviewIntro">
   <div class="intro-copy">
+    <div class="cover-orbits" aria-hidden="true"></div>
     <p class="edition">2025 — 2026</p>
     <h1>가현챈 XR 설문</h1>
     <p class="lead">어떤 헤드셋을 쓰고,<br class="hero-break"> PC에서 VR은 얼마나 잘 돌아갈까?</p>
@@ -29,17 +30,21 @@
   </nav>
   <figure class="year-compare" aria-labelledby="compare-title">
     <figcaption id="compare-title">퀘스트 3 비중은 줄고, VRChat 비중은 늘었다</figcaption>
-    <p class="compare-unit">각 해 전체 응답자 중 주사용 항목을 고른 비율</p>
+    <div class="compare-switch" role="group" aria-label="그래프 표시 기준" hidden>
+      <button type="button" data-unit="share" aria-pressed="true">비율</button>
+      <button type="button" data-unit="count" aria-pressed="false">인원수</button>
+    </div>
+    <p class="compare-unit" role="status" aria-atomic="true">각 해 전체 응답자 중 주사용 항목을 고른 비율</p>
     <div class="compare-scale" aria-hidden="true"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
     <div class="compare-group" role="group" aria-label="주력 헤드셋 퀘스트 3">
       <div class="compare-label"><strong>퀘스트 3</strong><span>−9.5%p</span></div>
-      <div class="compare-row"><span>2025</span><span class="compare-track" aria-hidden="true"><span style="--share:48%"></span></span><span class="compare-value"><strong>48.0%</strong> <small>95/198명</small></span></div>
-      <div class="compare-row current"><span>2026</span><span class="compare-track" aria-hidden="true"><span style="--share:38.5%"></span></span><span class="compare-value"><strong>38.5%</strong> <small>57/148명</small></span></div>
+      <div class="compare-row"><span>2025</span><span class="compare-track" aria-hidden="true"><span style="--share:48%" data-count="95" data-total="198"></span></span><span class="compare-value"><strong>48.0%</strong> <small>95/198명</small></span></div>
+      <div class="compare-row current"><span>2026</span><span class="compare-track" aria-hidden="true"><span style="--share:38.5%" data-count="57" data-total="148"></span></span><span class="compare-value"><strong>38.5%</strong> <small>57/148명</small></span></div>
     </div>
     <div class="compare-group" role="group" aria-label="주력 콘텐츠 VRChat">
       <div class="compare-label"><strong>VRChat</strong><span>+4.1%p</span></div>
-      <div class="compare-row"><span>2025</span><span class="compare-track" aria-hidden="true"><span style="--share:52%"></span></span><span class="compare-value"><strong>52.0%</strong> <small>103/198명</small></span></div>
-      <div class="compare-row current"><span>2026</span><span class="compare-track" aria-hidden="true"><span style="--share:56.1%"></span></span><span class="compare-value"><strong>56.1%</strong> <small>83/148명</small></span></div>
+      <div class="compare-row"><span>2025</span><span class="compare-track" aria-hidden="true"><span style="--share:52%" data-count="103" data-total="198"></span></span><span class="compare-value"><strong>52.0%</strong> <small>103/198명</small></span></div>
+      <div class="compare-row current"><span>2026</span><span class="compare-track" aria-hidden="true"><span style="--share:56.1%" data-count="83" data-total="148"></span></span><span class="compare-value"><strong>56.1%</strong> <small>83/148명</small></span></div>
     </div>
     <p class="compare-note">%p는 두 비율의 차이입니다. 연도별 응답자 구성을 비교했습니다.</p>
   </figure>

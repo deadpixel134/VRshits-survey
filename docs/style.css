@@ -14,7 +14,6 @@
 .graph-tools{padding:6px 0 8px;gap:6px}
 .graph-tools #zoom{width:110px;vertical-align:middle}
 .graph-tools output{font-weight:700;font-size:13px;min-width:44px;font-variant-numeric:tabular-nums}
-.gpu-limit-control{margin:4px 0 8px!important;font-size:13px}
 .sankey-selection{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:8;background:#edf6f7;border:1px solid #bbd5d7;border-radius:9px;padding:10px 12px;margin:4px 0 8px;font-size:13px}
 #selectionInfo{flex:1;min-width:0;line-height:1.5}
 #clearSelection{font-size:12px;white-space:nowrap}
@@ -384,3 +383,67 @@ article .table { overscroll-behavior-inline: contain; }
 .budget-jump a { display: inline-flex; align-items: center; min-height: 44px; }
 #detailed > h4 { font-size: 18px; margin: 28px 0 8px; }
 #detailed > h4 + .table { margin-top: 0; }
+
+/* Survey cover and unit comparison */
+.intro-copy { position: relative; isolation: isolate; overflow: hidden; }
+.cover-orbits {
+  position: absolute; z-index: -1; pointer-events: none;
+  width: 96%; aspect-ratio: 1; right: -44%; bottom: -30%;
+  transform: rotate(-28deg) scaleX(.8);
+  background: repeating-radial-gradient(ellipse at center, transparent 0 12px, #97ddcb35 13px 14px, transparent 15px 22px);
+  border-radius: 50%; mask-image: linear-gradient(130deg, transparent 5%, black 75%);
+}
+.intro-copy .scope { margin-bottom: 0; }
+.compare-switch {
+  display: inline-flex; margin-top: 14px; padding: 3px; gap: 3px;
+  border: 1px solid var(--line); border-radius: 9px; background: white;
+}
+.compare-switch button {
+  min-height: 44px; padding: 5px 16px; font-size: 14px; font-weight: 700;
+  border: 1px solid transparent; border-radius: 6px; color: var(--deep);
+}
+.compare-switch button[aria-pressed="true"] { color: white; background: var(--deep); }
+.year-compare.interactive .compare-track > span {
+  width: 100%; transform-origin: left; transform: scaleX(var(--fraction));
+}
+.compare-group .compare-label { border-color: #ccdcd6; }
+.compare-label > span { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) {
+  .year-compare.interactive .compare-track > span { transition: transform 320ms cubic-bezier(.22,.72,.24,1); }
+  .compare-switch button { transition: background-color 160ms, color 160ms; }
+}
+
+@media (max-width: 950px) {
+  #graphPanel.sheet-motion {
+    --sheet-offset: 32px;
+    --sheet-opacity: 0;
+    --sheet-duration: 200ms;
+    --ease-drawer: cubic-bezier(.32, .72, 0, 1);
+    transform: translateY(var(--sheet-offset));
+    opacity: var(--sheet-opacity);
+    transition: transform var(--sheet-duration) var(--ease-drawer),
+                opacity var(--sheet-duration) var(--ease-drawer),
+                display var(--sheet-duration) allow-discrete;
+  }
+  .mobile-open #graphPanel.sheet-motion {
+    --sheet-duration: 220ms;
+    transform: none;
+    opacity: 1;
+  }
+  @starting-style {
+    .mobile-open #graphPanel.sheet-motion {
+      transform: translateY(var(--sheet-offset));
+      opacity: var(--sheet-opacity);
+    }
+  }
+}
+@media (max-width: 950px) and (prefers-reduced-motion: reduce) {
+  #graphPanel.sheet-motion, .mobile-open #graphPanel.sheet-motion {
+    --sheet-offset: 0px;
+    --sheet-opacity: .9;
+    --sheet-duration: 80ms;
+    transform: none;
+  }
+}
+
+#chart svg.paired-flow { margin-inline: auto; }

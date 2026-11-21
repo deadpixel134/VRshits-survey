@@ -138,9 +138,11 @@ const compare=(k,a,b)=>k==='gpu'
  :ordered[k]?ordered[k].indexOf(a[0])-ordered[k].indexOf(b[0])
  :b[1]-a[1]||a[0].localeCompare(b[0]);
 const layers=c.keys.map((k,i)=>{const m=new Map;for(const l of selected.links.filter(l=>l[0]===(i===0?1:i))){const name=l[i===0?1:2];m.set(name,(m.get(name)||0)+l[3]);}return [...m].sort((a,b)=>compare(k,a,b)).map(([name,value])=>({name,value,layer:i,inOff:0,outOff:0}));});
-const maxNodes=Math.max(1,...layers.map(x=>x.length)),H=Math.max(640,maxNodes*38+100),W=1500,top=65,bottom=35,gap=15,scale=n?(H-top-bottom-(maxNodes-1)*gap)/n:1;
-// Reserve space only for the rightmost labels, instead of a fixed 360px gutter.
-// SVG node text is 14px; Hangul uses approximately 14px per character.
+const paired=layers.length===2;
+const maxNodes=Math.max(1,...layers.map(layer=>layer.length));
+const top=paired?44:65,bottom=paired?22:35,gap=paired?18:15;
+const H=paired?Math.max(300,maxNodes*25+top+bottom):Math.max(640,maxNodes*38+100);
+const scale=n?(H-top-bottom-(maxNodes-1)*gap)/n:1;
 function estimateLabelWidth(str){
  return [...str].reduce((sum,ch)=>sum+(ch===' '?4:/[가-힣]/.test(ch)?14:/[A-Z]/.test(ch)?9:/[0-9]/.test(ch)?8:7),0);
 }
@@ -148,8 +150,28 @@ const rightLayer=layers[layers.length-1]||[];
 const lastLabelWidth=Math.max(estimateLabelWidth(c.titles.at(-1)),
  ...rightLayer.map(node=>estimateLabelWidth(node.name+' · '+node.value)));
 const rightPadding=Math.max(100,Math.ceil(lastLabelWidth+46));
+// Keep labels in the outer margins so two-column flows have a short, clear path.
+const firstX=paired?Math.ceil(Math.max(estimateLabelWidth(c.titles[0]),
+ ...layers[0].map(node=>estimateLabelWidth(node.name+' · '+node.value)))+26):30;
+const W=paired?firstX+212+rightPadding:1500;
 const finalX=W-rightPadding;
-const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:W,height:H,role:'group','aria-label':c.titles.join(' → ')+' · '+n+'명'});const maps=layers.map((layer,i)=>{const total=n*scale+(layer.length-1)*gap;let y=top+(H-top-bottom-total)/2;const x=30+i*(finalX-30)/(layers.length-1);svg.append(el('text',{x,y:30,'font-size':17,'font-weight':700,fill:'#23364d'},c.titles[i]));const m=new Map;for(const node of layer){node.x=x;node.y=y;node.h=node.value*scale;y+=node.h+gap;m.set(node.name,node);}return m;});nodeIndex=layers.flat();
+const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,width:W,height:H,class:paired?'paired-flow':'multi-flow',role:'group','aria-label':c.titles.join(' → ')+' · '+n+'명'});
+const maps=layers.map((layer,i)=>{
+ const x=firstX+i*(finalX-firstX)/(layers.length-1);
+ const layerHeight=n*scale+(layer.length-1)*gap;
+ let y=paired?top+(H-top-bottom-layerHeight)/2:top;
+ svg.append(el('text',{x,y:paired?25:30,'text-anchor':paired&&i===0?'end':'start','font-size':17,'font-weight':700,fill:'#23364d'},c.titles[i]));
+ const byName=new Map();
+ for(const node of layer){
+  node.x=x;
+  node.y=y;
+  node.h=node.value*scale;
+  y+=node.h+gap;
+  byName.set(node.name,node);
+ }
+ return byName;
+});
+nodeIndex=layers.flat();
 const picker=$('nodeJump');picker.replaceChildren();
 const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='항목 선택…';picker.append(placeholder);
 for(const node of nodeIndex){
@@ -158,7 +180,7 @@ for(const node of nodeIndex){
  picker.append(opt);
 }currentLinks=[];
 for(let i=0;i<c.keys.length-1;i++){const links=selected.links.filter(l=>l[0]===i+1).map(l=>({names:[l[1],l[2]],value:l[3]})).sort((a,b)=>maps[i].get(a.names[0]).y-maps[i].get(b.names[0]).y||maps[i+1].get(a.names[1]).y-maps[i+1].get(b.names[1]).y);for(const l of links){const a=maps[i].get(l.names[0]),b=maps[i+1].get(l.names[1]),h=l.value*scale,x1=a.x+16,x2=b.x,y1=a.y+a.outOff,y2=b.y+b.inOff,midx=(x1+x2)/2;a.outOff+=h;b.inOff+=h;const path=el('path',{d:`M${x1},${y1} C${midx},${y1} ${midx},${y2} ${x2},${y2} L${x2},${y2+h} C${midx},${y2+h} ${midx},${y1+h} ${x1},${y1+h} Z`,fill:'#537e78',opacity:.28,class:'link','data-stage':i+1,'data-source':a.name,'data-target':b.name,tabindex:-1});path.append(el('title',{},`${a.name} → ${b.name}: ${l.value}명 (${n?(l.value/n*100).toFixed(1):0}%)`));svg.append(path);currentLinks.push([i+1,a.name,b.name,l.value,n]);}}
-for(const layer of layers)for(const node of layer){svg.append(el('rect',{x:node.x,y:node.y,width:16,height:node.h,rx:2,fill:color(c.keys[node.layer],node.name),'data-category':node.name,'data-node-layer':node.layer,'data-node-name':node.name,'data-node-count':node.value,tabindex:0,role:'button','aria-label':`${node.name}, ${node.value}명`}));const label=el('text',{x:node.x+22,y:node.y+node.h/2+4,'font-size':14,fill:'#172b40','data-node-layer':node.layer,'data-node-name':node.name,'data-node-count':node.value});const full=`${node.name} · ${node.value}`;label.textContent=full.length>39?full.slice(0,37)+'…':full;label.append(el('title',{},full));svg.append(label);}
+for(const layer of layers)for(const node of layer){svg.append(el('rect',{x:node.x,y:node.y,width:16,height:node.h,rx:2,fill:color(c.keys[node.layer],node.name),'data-category':node.name,'data-node-layer':node.layer,'data-node-name':node.name,'data-node-count':node.value,tabindex:0,role:'button','aria-label':`${node.name}, ${node.value}명`}));const label=el('text',{x:paired&&node.layer===0?node.x-8:node.x+22,'text-anchor':paired&&node.layer===0?'end':'start',y:node.y+node.h/2+4,'font-size':14,fill:'#172b40','data-node-layer':node.layer,'data-node-name':node.name,'data-node-count':node.value});const full=`${node.name} · ${node.value}`;label.textContent=full.length>39?full.slice(0,37)+'…':full;label.append(el('title',{},full));svg.append(label);}
 if(!n)svg.append(el('text',{x:40,y:100},'선택 조건에 해당하는 응답이 없습니다.'));$('chart').replaceChildren(svg);updateChartZoom();resetSelection();$('legend').replaceChildren();for(const layer of layers){const box=document.createElement('div');box.style.margin='10px 0';const title=document.createElement('strong');title.textContent=c.titles[layer[0]?.layer||0]+' ';box.append(title);for(const node of layer){const item=document.createElement('span');item.style.cssText='display:inline-flex;align-items:center;gap:5px;margin:3px 12px 3px 0;font-size:13px';const swatch=document.createElement('i');swatch.style.cssText='display:inline-block;width:12px;height:12px;background:'+color(c.keys[node.layer],node.name);item.append(swatch,document.createTextNode(node.name));box.append(item);}$('legend').append(box);}
 const t=document.createElement('table');const tr=document.createElement('tr');for(const h of ['단계','출발','도착','인원','분모']){const th=document.createElement('th');th.scope='col';th.textContent=h;tr.append(th);}t.append(tr);for(const r of currentLinks){
  const tr=document.createElement('tr');tr.tabIndex=0;tr.setAttribute('role','button');

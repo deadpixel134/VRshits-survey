@@ -207,8 +207,19 @@ for(const type of ['content','perception','perf','mode']){
  const rect=svg.querySelectorAll('[data-node-layer]').find(node=>
   node.tagName==='rect'&&node.dataset.nodeLayer===String(last));
  assert(rect,'Expected a rightmost node in '+type);
+ if(last>1){
+  const nodes=svg.querySelectorAll('[data-node-layer]').filter(node=>node.tagName==='rect');
+  const starts=window.sankeyState.keys.map((_,i)=>nodes.find(node=>node.dataset.nodeLayer===String(i)).getAttribute('y'));
+  assert.equal(new Set(starts).size,1,'All stages must start on the same row in '+type);
+ }
  const endX=Number(rect.getAttribute('x'));
- assert(endX>=1190&&endX<=1410,'Last column should leave only label-dependent padding in '+type+' (got '+endX+')');
+ const width=Number(svg.getAttribute('width'));
+ if(last===1){
+  assert(width<720,'Two-column charts should keep both labels within a compact reading width');
+  const label=svg.querySelectorAll('[data-node-layer]').find(node=>node.tagName==='text'&&node.dataset.nodeLayer==='0');
+  assert.equal(label.getAttribute('text-anchor'),'end');
+ }
+ assert(width-endX>=90&&width-endX<=310,'Last column should leave only label-dependent padding in '+type+' (got '+endX+')');
 }
 
 // Exercise real site.js zoom controller in a standalone-like DOM.
@@ -218,7 +229,7 @@ const controls=Object.fromEntries(['zoom','chart','zoomValue','zoomIn','zoomOut'
 const [slider,viewport]=[controls.zoom,controls.chart];
 slider.value='100';slider.min='20';slider.max='200';slider.step='1';
 viewport.clientWidth=550;viewport.clientHeight=500;
-const chartSVG={style:{width:'1500px'}};
+const chartSVG={style:{width:'1500px'},viewBox:{baseVal:{width:1500}},classList:{contains:()=>false}};
 viewport.querySelector=selector=>selector==='svg'?chartSVG:null;
 viewport.getBoundingClientRect=()=>({left:0,top:0});
 const zoomDoc={getElementById:id=>id==='reading'?null:controls[id],
@@ -229,7 +240,7 @@ const fitAPI=new Function('document','location','URLSearchParams','ResizeObserve
 fitAPI.updateChartZoom();
 assert.equal(Number(slider.value),36,'Initial chart should fit a 550px viewport');
 assert.equal(chartSVG.style.width,'540px','SVG width should be close to viewport');
-const redrawSVG={style:{width:'1500px'}};
+const redrawSVG={style:{width:'1500px'},viewBox:{baseVal:{width:1500}},classList:{contains:()=>false}};
 viewport.querySelector=selector=>selector==='svg'?redrawSVG:null;
 fitAPI.updateChartZoom();
 assert.equal(Number(slider.value),36,'Rerender at unchanged viewport keeps fit percentage');

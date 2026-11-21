@@ -4,7 +4,7 @@ const zoomValue=document.getElementById('zoomValue');
 let fitToWidth=true;
 function applyZoom(){
  const svg=chartViewport.querySelector('svg');
- if(svg)svg.style.width=(1500*Number(zoom.value)/100)+'px';
+ if(svg)svg.style.width=(svg.viewBox.baseVal.width*Number(zoom.value)/100)+'px';
  zoomValue.textContent=Math.round(Number(zoom.value))+'%';
 }
 function setZoom(value,x=chartViewport.clientWidth/2,y=chartViewport.clientHeight/2){
@@ -20,8 +20,9 @@ function fitGraph(){
  fitToWidth=true;
  // Leave a small inset so the SVG does not require horizontal scrolling.
  const width=chartViewport.clientWidth;
- if(width<=0)return; // Hidden mobile sheet: fit when it becomes visible.
- const percentage=Math.floor((width-8)/1500*100);
+ const svg=chartViewport.querySelector('svg');
+ if(width<=0||!svg)return; // Hidden mobile sheet: fit when it becomes visible.
+ const percentage=Math.min(svg.classList.contains('paired-flow')?100:Number(zoom.max),Math.floor((width-8)/svg.viewBox.baseVal.width*100));
  setZoom(percentage);
  // A newly rendered SVG needs this width even when the fit percentage is unchanged.
  applyZoom();
@@ -35,14 +36,19 @@ zoom.addEventListener('input',()=>{
  fitToWidth=false;
  const next=Number(zoom.value);
  const svg=chartViewport.querySelector('svg');
- const old=svg?parseFloat(svg.style.width)/15:next;
+ const old=svg?parseFloat(svg.style.width)/svg.viewBox.baseVal.width*100:next;
  zoom.value=old||next;
  setZoom(next);
 });
 document.getElementById('fit').onclick=fitGraph;
 document.getElementById('zoomIn').onclick=()=>{fitToWidth=false;setZoom(Number(zoom.value)+10);};
 document.getElementById('zoomOut').onclick=()=>{fitToWidth=false;setZoom(Number(zoom.value)-10);};
-document.getElementById('resetView').onclick=()=>{fitToWidth=false;setZoom(100);chartViewport.scrollLeft=0;chartViewport.scrollTop=0;};
+document.getElementById('resetView').onclick=()=>{
+ fitToWidth=false;
+ setZoom(chartViewport.querySelector('svg.paired-flow')?125:100);
+ chartViewport.scrollLeft=0;
+ chartViewport.scrollTop=0;
+};
 chartViewport.addEventListener('wheel',event=>{
  if(!event.ctrlKey)return;
  event.preventDefault();fitToWidth=false;
@@ -74,7 +80,56 @@ if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(fitToWidth)fit
 applyZoom();
 
 const reading=document.getElementById('reading');
+function enableYearComparison(figure) {
+  const controls = figure.querySelector('.compare-switch');
+  const buttons = controls.querySelectorAll('button');
+  const groups = [...figure.querySelectorAll('.compare-group')].map(group => ({
+    difference: group.querySelector('.compare-label span'),
+    rows: [...group.querySelectorAll('.compare-row')].map(row => {
+      const bar = row.querySelector('[data-count]');
+      return {
+        bar,
+        value: row.querySelector('.compare-value strong'),
+        context: row.querySelector('.compare-value small'),
+        count: Number(bar.dataset.count),
+        total: Number(bar.dataset.total),
+        share: parseFloat(bar.style.getPropertyValue('--share'))
+      };
+    })
+  }));
+  const countStep = Math.ceil(Math.max(...groups.flatMap(group => group.rows.map(row => row.count))) / 40) * 10;
+  function showUnit(unit) {
+    const counts = unit === 'count';
+    for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.unit === unit));
+    figure.querySelectorAll('.compare-scale span').forEach((tick, index) => {
+      tick.textContent = counts ? index * countStep + '명' : index * 25 + '%';
+    });
+    for (const {rows, difference} of groups) {
+      for (const row of rows) {
+        row.bar.style.setProperty('--fraction', counts ? row.count / (countStep * 4) : row.share / 100);
+        row.value.textContent = counts ? row.count + '명' : row.share.toFixed(1) + '%';
+        row.context.textContent = counts ? '전체 ' + row.total + '명' : row.count + '/' + row.total + '명';
+      }
+      const change = rows[1][unit] - rows[0][unit];
+      difference.textContent = (change < 0 ? '−' : '+') + Math.abs(change).toFixed(counts ? 0 : 1) + (counts ? '명' : '%p');
+    }
+    figure.querySelector('.compare-note').textContent = counts
+      ? '2025년에는 198명, 2026년에는 148명이 응답했습니다.'
+      : '%p는 두 비율의 차이입니다. 연도별 응답자 구성을 비교했습니다.';
+    figure.querySelector('.compare-unit').textContent = counts
+      ? '각 해 주사용 항목을 고른 응답자 수'
+      : '각 해 전체 응답자 중 주사용 항목을 고른 비율';
+    figure.querySelector('figcaption').textContent = counts
+      ? '인원수로 보면 두 항목 모두 줄었다'
+      : '퀘스트 3 비중은 줄고, VRChat 비중은 늘었다';
+  }
+  for (const button of buttons) button.addEventListener('click', () => showUnit(button.dataset.unit));
+  showUnit('share');
+  figure.classList.add('interactive');
+  controls.hidden = false;
+}
 if (reading) {
+enableYearComparison(reading.querySelector('.year-compare'));
 const toggle = document.getElementById('toggleGraph');
 const mobile = document.getElementById('mobileGraph');
 let lastTrigger = null;
@@ -88,7 +143,10 @@ function syncReadingAccess(open) {
   document.body.classList.toggle('sheet-open', sheetOpen);
 }
 
-function setGraph(open, trigger) {
+const graphPanel = document.getElementById('graphPanel');
+function setGraph(open, trigger, event) {
+  graphPanel.classList.toggle('sheet-motion', !desktopSplit.matches && event?.detail > 0);
+  graphPanel.inert = !open;
   if (trigger) lastTrigger = trigger;
   document.body.classList.toggle('graph-closed', !open);
   document.body.classList.toggle('mobile-open', open);
@@ -99,8 +157,9 @@ function setGraph(open, trigger) {
   }
   if (open) {
     requestAnimationFrame(() => {
+      if (!isGraphOpen()) return;
       updateChartZoom();
-      if (trigger) document.getElementById('diagram').focus();
+      if (trigger) document.getElementById('diagram').focus({preventScroll:true});
     });
   } else if (lastTrigger) {
     const focusTarget = lastTrigger.getClientRects().length
@@ -111,8 +170,8 @@ function setGraph(open, trigger) {
 }
 const isGraphOpen = () => !document.body.classList.contains('graph-closed');
 toggle.onclick = () => setGraph(!isGraphOpen(), isGraphOpen() ? null : toggle);
-mobile.onclick = () => setGraph(!isGraphOpen(), isGraphOpen() ? null : mobile);
-document.getElementById('closeGraph').onclick = () => setGraph(false, lastTrigger || (desktopSplit.matches ? toggle : mobile));
+mobile.onclick = event => setGraph(!isGraphOpen(), isGraphOpen() ? null : mobile, event);
+document.getElementById('closeGraph').onclick = event => setGraph(false, lastTrigger || (desktopSplit.matches ? toggle : mobile), event);
 document.getElementById('expandGraph').onclick = () => toggleWideGraph();
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !event.defaultPrevented && isGraphOpen()) {
@@ -320,11 +379,12 @@ if(location.hash==='#general'||location.hash==='#detailed'){
   window.addEventListener('load',()=>requestAnimationFrame(()=>window.scrollTo(0,0)),{once:true});
 }else if(location.hash)focusDeepLink();
 
-document.querySelectorAll('[data-chart]').forEach(b=>b.onclick=()=>{document.getElementById('diagram').value=b.dataset.chart;document.getElementById('group').value=b.closest('article')?.id==='general'&&b.previousElementSibling?.textContent.includes('VRChat')?'VRChat':'전체';setGraph(true,b);render();});
+document.querySelectorAll('[data-chart]').forEach(b=>b.onclick=event=>{document.getElementById('diagram').value=b.dataset.chart;document.getElementById('group').value=b.closest('article')?.id==='general'&&b.previousElementSibling?.textContent.includes('VRChat')?'VRChat':'전체';setGraph(true,b,event);render();});
 setGraph(new URLSearchParams(location.search).has('chart'));
 const contents=document.querySelector('.toc');
 contents.open=desktopSplit.matches;
 desktopSplit.addEventListener('change', event => {
+  graphPanel.classList.remove('sheet-motion');
   contents.open = event.matches;
   if (beforeWide !== null) applySplit(beforeWide);
   clearWide();
